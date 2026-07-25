@@ -166,11 +166,19 @@ class OpenAIClient:
         if response_format is not None:
             # Ollama accepts a JSON schema here; vLLM uses guided_json (see below).
             payload["response_format"] = response_format
-        r = self._requests.post(
-            f"{self.base_url}/chat/completions", json=payload, headers=self._headers(), timeout=self.timeout
-        )
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
+        import time as _t
+        last = None
+        for attempt in range(5):
+            r = self._requests.post(
+                f"{self.base_url}/chat/completions", json=payload, headers=self._headers(), timeout=self.timeout
+            )
+            if r.status_code in (429, 500, 502, 503, 504):  # rate-limited / transient -> back off
+                last = r
+                _t.sleep(min(2 ** attempt * 1.5, 30))
+                continue
+            r.raise_for_status()
+            return r.json()["choices"][0]["message"]["content"]
+        last.raise_for_status()  # exhausted retries
 
     def generate_plan(self, system_prompt, user_prompt, context_passages, cfg, fewshot_on, case, strict=False):
         response_format = None
@@ -184,7 +192,9 @@ class OpenAIClient:
                 "\n\nRE-GROUNDING PASS: regenerate the plan using ONLY the CONTEXT passages. "
                 "Every claim must cite a guideline_id that appears in the CONTEXT and whose text "
                 "supports the claim. Do not include any medication absent from the patient's list.")
-        content = self._chat(system_prompt, user_prompt, response_format=response_format)
+        # Large budget: reasoning models (e.g. Gemma 4 thinking mode, which can't be disabled)
+        # spend hidden tokens before emitting JSON; too small a cap truncates the plan.
+        content = self._chat(system_prompt, user_prompt, response_format=response_format, max_tokens=6144)
         try:
             return _coerce_plan(json.loads(content))
         except (json.JSONDecodeError, TypeError):

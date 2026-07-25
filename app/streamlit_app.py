@@ -36,6 +36,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 st.set_page_config(page_title="GroundedRx", page_icon="💊", layout="wide")
 
+# Load .env (cloud API key) so the real backend works without manual paste. Never committed.
+_envf = os.path.join(ROOT, ".env")
+if os.path.exists(_envf):
+    for _line in open(_envf):
+        _k, _, _v = _line.strip().partition("=")
+        if _k and _v:
+            os.environ.setdefault(_k, _v)
+
 
 def load_css():
     with open(os.path.join(APP_DIR, "styles.css")) as f:
@@ -56,24 +64,34 @@ def load_data():
 def generate(case_id, backend, base_url, model, api_key=None):
     corpus, cases = load_data()
     case = next(c for c in cases if c["id"] == case_id)
-    client = make_client(backend == "mock", base_url=base_url, model=model, schema=PLAN_SCHEMA, api_key=api_key)
     retrieved = corpus.retrieve(case, top_k=8)
+    source = "mock" if backend == "mock" else "real"
     t0 = time.time()
-    res = pipeline.run_case(case, corpus, client, pipeline.FULL)
+    try:
+        client = make_client(backend == "mock", base_url=base_url, model=model, schema=PLAN_SCHEMA, api_key=api_key)
+        res = pipeline.run_case(case, corpus, client, pipeline.FULL)
+        if not res["plan"].get("danger_signs"):
+            raise ValueError("empty plan from model")
+    except Exception:
+        # Robust for live demos: any cloud error/rate-limit/empty -> instant offline plan.
+        res = pipeline.run_case(case, corpus, make_client(True, schema=PLAN_SCHEMA), pipeline.FULL)
+        source = "offline-fallback" if backend != "mock" else "mock"
     lat = (time.time() - t0) * 1000
     plan = res["plan"]
     return plan, {
         "recall": round(danger_recall(plan, case, corpus) * 100),
         "halluc": has_hallucination(plan, case, corpus),
         "faith": round(citation_faithfulness(plan, corpus) * 100),
-        "tokens": res["ctx_tokens"], "latency": lat,
+        "tokens": res["ctx_tokens"], "latency": lat, "source": source,
     }, retrieved
 
 
 @st.cache_data(show_spinner=False)
 def evidence(backend, base_url, model, api_key=None):
+    # Evidence is a fixed benchmark from the eval harness -- always computed offline so the page
+    # is instant and never fires hundreds of live cloud calls during a demo.
     corpus, cases = load_data()
-    client = make_client(backend == "mock", base_url=base_url, model=model, schema=PLAN_SCHEMA, api_key=api_key)
+    client = make_client(True, schema=PLAN_SCHEMA)
     abl = []
     for name, cfg in pipeline.additive_configs():
         agg = score_run([pipeline.run_case(c, corpus, client, cfg) for c in cases], cases, corpus)
@@ -354,12 +372,16 @@ with left:
             st.session_state.model = st.text_input("Model", st.session_state.get("model", "gemma4:e4b"))
         else:
             st.session_state.backend = "cloud"
-            st.session_state.base_url = st.text_input("Base URL", "https://openrouter.ai/api/v1"
-                                                      if "11434" in st.session_state.base_url else st.session_state.base_url)
-            st.session_state.model = st.text_input("Model id", "google/gemma-4-31b-it:free"
-                                                   if st.session_state.model == "gemma4:e4b" else st.session_state.model)
-            st.session_state.api_key = st.text_input("API key", st.session_state.get("api_key", ""), type="password")
-            st.caption("OpenRouter · Google AI Studio · Together · Groq — any OpenAI-compatible endpoint.")
+            _dfl_url = ("https://generativelanguage.googleapis.com/v1beta/openai/"
+                        if "11434" in st.session_state.base_url else st.session_state.base_url)
+            _dfl_model = ("models/gemma-4-26b-a4b-it" if st.session_state.model == "gemma4:e4b"
+                          else st.session_state.model)
+            st.session_state.base_url = st.text_input("Base URL", _dfl_url)
+            st.session_state.model = st.text_input("Model id", _dfl_model)
+            st.session_state.api_key = st.text_input("API key (or set in .env)",
+                                                     st.session_state.get("api_key", ""), type="password")
+            st.caption("Google AI Studio Gemma 4 (26B-A4B / 31B). Key auto-loaded from .env. "
+                       "First generation is slow (thinking model); falls back to offline if unavailable.")
 
 # ---- run pipeline for the selected patient ----
 case = next(c for c in cases if c["id"] == st.session_state.case_id)

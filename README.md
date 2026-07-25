@@ -25,6 +25,19 @@ is what did it.
 - Python **3.12** (Homebrew). Build a venv with it.
 - Models: `gemma4:e4b` (SLM under test), `gemma4:12b` (big baseline).
 
+## See the platform (no server)
+
+Open **`GroundedRx.html`** directly in any browser (double-click). It is fully self-contained —
+all 30 patients, grounded plans, context graphs, a client-side grounded copilot, and the
+evidence artifacts (ablation table + charts) are baked in; nothing is fetched, so it works
+offline / in airplane mode. Regenerate it from the pipeline any time:
+
+```bash
+python app/build_static.py     # -> GroundedRx.html
+```
+
+For the live, model-backed app: `streamlit run app/streamlit_app.py`.
+
 ## Quickstart
 
 ```bash

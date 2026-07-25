@@ -127,3 +127,34 @@ VERIFY_SYSTEM = (
     "You are a strict fact-checker. Given a claim and its cited passage, answer with exactly "
     "one word: SUPPORTED or UNSUPPORTED."
 )
+
+
+def validate_plan(plan):
+    """Lightweight check that a plan conforms to PLAN_SCHEMA. Returns (ok, [errors]).
+
+    Mirrors the locked schema (Layer 3): required keys, danger_signs non-empty, each item
+    carries its required fields including a guideline_id. Used for the Phase 3 DONE check
+    ('schema-valid JSON for a case, per config') without pulling in a jsonschema dependency.
+    """
+    errors = []
+    if not isinstance(plan, dict):
+        return False, ["plan is not an object"]
+    for key in ("danger_signs", "medications", "lifestyle"):
+        if key not in plan or not isinstance(plan[key], list):
+            errors.append(f"missing/invalid array: {key}")
+    if isinstance(plan.get("danger_signs"), list) and len(plan["danger_signs"]) < 1:
+        errors.append("danger_signs must be non-empty (minItems 1)")
+    fields = {
+        "danger_signs": ("text", "guideline_id"),
+        "medications": ("drug", "instruction", "guideline_id"),
+        "lifestyle": ("text", "guideline_id"),
+    }
+    for key, req in fields.items():
+        for i, item in enumerate(plan.get(key, []) or []):
+            if not isinstance(item, dict):
+                errors.append(f"{key}[{i}] is not an object")
+                continue
+            for f in req:
+                if f not in item:
+                    errors.append(f"{key}[{i}] missing field: {f}")
+    return (len(errors) == 0), errors

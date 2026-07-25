@@ -52,10 +52,12 @@ class MockClient:
             plan["danger_signs"].append({"text": p["text"], "guideline_id": cid})
 
         # --- Medications: only those actually in context. ---------------------
+        # Instruction is grounded in the passage (a real model paraphrases its source),
+        # so the verify pass keeps legitimately-cited meds.
         for p in meds:
             cid = p["id"] if cfg.schema else ""
             plan["medications"].append(
-                {"drug": p["drug"], "instruction": "Take as prescribed by your care team.", "guideline_id": cid}
+                {"drug": p["drug"], "instruction": _first_sentence(p["text"]), "guideline_id": cid}
             )
 
         # --- HALLUCINATION: always invent an unlisted med with a bogus citation.
@@ -164,6 +166,13 @@ class OpenAIClient:
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
+def _first_sentence(text):
+    import re
+
+    parts = re.split(r"(?<=[.!?])\s+", str(text).strip())
+    return parts[0] if parts else str(text)
+
+
 def _tokenize(text):
     return [w.strip(".,;:()").lower() for w in str(text).split()]
 

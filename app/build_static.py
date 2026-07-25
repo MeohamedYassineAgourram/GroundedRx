@@ -151,13 +151,15 @@ TEMPLATE = r"""<!doctype html>
 body { margin:0; padding:18px 24px 40px; }
 .grid { display:grid; grid-template-columns:1fr 2.5fr 1.5fr; gap:16px; align-items:start; }
 @media (max-width:1100px){ .grid{ grid-template-columns:1fr; } }
-.pat-row{ width:100%; text-align:left; background:#fff; border:1px solid var(--border); border-radius:12px;
-  padding:10px 12px; margin-bottom:8px; color:var(--body); font-weight:500; cursor:pointer; transition:all .15s; font-size:13px; }
-.pat-row:hover{ border-color:#bfdbfe; background:#f8fbff; color:var(--ink); transform:translateY(-1px);
-  box-shadow:0 6px 14px -8px rgba(37,99,235,.4); }
-.pat-row.active{ border-color:#2563eb; background:#eff6ff; color:#1d4ed8; font-weight:600; }
-.ghead{ background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:10px 14px; font-weight:700;
-  color:#0f172a; font-size:15px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; }
+.pat-row{ width:100%; text-align:left; background:rgba(255,255,255,0.65); border:1px solid var(--border); border-radius:14px;
+  padding:11px 13px; margin-bottom:8px; color:var(--body); font-weight:500; cursor:pointer; transition:all .16s; font-size:13px; }
+.pat-row:hover{ border-color:#c7dbff; background:#f4f8ff; color:var(--ink); transform:translateY(-1px);
+  box-shadow:0 10px 20px -12px rgba(79,124,255,.5); }
+.pat-row.active{ border-color:#4f7cff; background:#eef4ff; color:#3b6fe0; font-weight:600;
+  box-shadow:0 10px 20px -12px rgba(79,124,255,.5); }
+.ghead{ background:linear-gradient(135deg, rgba(238,242,253,0.95), rgba(241,236,251,0.95)); border:1px solid var(--glass-edge);
+  border-radius:14px; padding:11px 15px; font-weight:700; color:var(--ink); font-size:15px; margin-bottom:14px;
+  display:flex; align-items:center; justify-content:space-between; }
 .gmeta{ font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
 .glegend{ display:flex; gap:16px; justify-content:center; margin-top:6px; font-size:12px; color:#475569; }
 .glegend i{ display:inline-block; width:9px; height:9px; border-radius:9999px; margin-right:5px; }
@@ -185,7 +187,10 @@ table.abl td.g{ color:#047857; font-weight:700; } table.abl td.r{ color:#dc2626;
   <div class="gr-brand"><div class="gr-logo">💊</div>
     <div><div class="gr-brand-title">GroundedRx</div>
     <div class="gr-brand-sub">Context-engineered aftercare · grounded to source · privacy-preserving</div></div></div>
-  <div><span class="gr-pill gr-pill-ground"><span class="gr-live"></span>Gemma 4 E4B · Offline demo</span></div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="gr-pill gr-pill-ground"><span class="gr-live"></span>Gemma 4 E4B · Offline</span>
+    <span class="gr-switch" title="On-device inference"></span>
+  </div>
 </div>
 <div class="grid">
   <div>
@@ -252,20 +257,28 @@ function rows(items, kind){
     return `<div class='${rc}'><span class='gr-dot ${dot}'></span><div>${txt}${cite}</div></div>`;
   }).join('');
 }
+function ring(pct, color, center){
+  const r=25, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,pct))/100);
+  return `<svg width="62" height="62" viewBox="0 0 62 62">
+    <circle cx="31" cy="31" r="${r}" fill="none" stroke="#edf0f7" stroke-width="7"/>
+    <circle cx="31" cy="31" r="${r}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round"
+      stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 31 31)"/>
+    <text x="31" y="36" text-anchor="middle" class="cv">${center}</text></svg>`;
+}
 function plan(){
   const c = D.cases[active], m = c.metrics;
-  const hcls = m.halluc?'bad':'good';
+  const save = Math.round(100*(1 - m.tokens/2685));
   document.getElementById('plan').innerHTML = `
     <div class='gr-card-head'>📋 Grounded Aftercare Plan
       <span class='gr-pill gr-pill-ground' style='margin-left:auto'>context-engineered</span></div>
     <div class='gr-label'>Patient</div>
-    <div style='font-size:15px;font-weight:600;color:#0f172a'>${c.profile}</div>
-    <div style='font-size:12.5px;color:#64748b;margin-bottom:14px'>Prescribed: ${c.meds.join(', ')}</div>
-    <div class='gr-chips'>
-      <div class='gr-chip good'><div class='v'>${m.recall}%</div><div class='k'>Danger recall</div></div>
-      <div class='gr-chip ${hcls}'><div class='v'>${m.halluc?'YES':'None'}</div><div class='k'>Hallucination</div></div>
-      <div class='gr-chip good'><div class='v'>${m.faith}%</div><div class='k'>Citation faith</div></div>
-      <div class='gr-chip'><div class='v'>${m.tokens}</div><div class='k'>Ctx tokens</div></div></div>
+    <div style='font-size:15px;font-weight:600;color:var(--ink)'>${c.profile}</div>
+    <div style='font-size:12.5px;color:var(--muted);margin-bottom:16px'>Prescribed: ${c.meds.join(', ')}</div>
+    <div class='gr-gauges'>
+      <div class='gr-gauge'>${ring(m.recall,'#34d399',m.recall+'%')}<div class='lab'>Danger recall</div></div>
+      <div class='gr-gauge'>${ring(m.halluc?100:100, m.halluc?'#f43f5e':'#34d399', m.halluc?'!':'✓')}<div class='lab'>Hallucination</div></div>
+      <div class='gr-gauge'>${ring(m.faith,'#4f7cff',m.faith+'%')}<div class='lab'>Citation faith</div></div>
+      <div class='gr-gauge'>${ring(save,'#a78bfa',m.tokens)}<div class='lab'>Ctx tokens · −${save}%</div></div></div>
     <div class='gr-label' style='margin-top:18px'>🚨 Danger signs — seek care if you notice</div>${rows(c.plan.danger_signs,'danger')}
     <div class='gr-label' style='margin-top:16px'>💊 Prescribed medications & guidance</div>${rows(c.plan.medications,'med')}
     <div class='gr-label' style='margin-top:16px'>🥗 Lifestyle & follow-up</div>${rows(c.plan.lifestyle,'life')}`;

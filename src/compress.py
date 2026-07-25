@@ -12,9 +12,13 @@ import re
 _STOP_TAIL = re.compile(r"\s*(,|;|:)\s.*$")  # trim trailing clauses
 
 
+def _sentences(text):
+    return [sentence for sentence in re.split(r"(?<=[.!?])\s+", text.strip()) if sentence]
+
+
 def _first_sentence(text):
-    m = re.split(r"(?<=[.!?])\s+", text.strip())
-    return m[0] if m else text
+    parts = _sentences(text)
+    return parts[0] if parts else text
 
 
 def compress_passage(p, enabled=True):
@@ -25,8 +29,10 @@ def compress_passage(p, enabled=True):
         # Keep danger signs nearly whole -- never compress away a safety fact.
         return _first_sentence(p["text"])
     if p["type"] == "medication":
-        # Keep the drug's purpose + primary caution: first sentence is the core.
-        return _first_sentence(p["text"])
+        # A discharge plan needs the actionable caution/timing, which commonly sits in the
+        # second sentence.  Preserve it rather than claiming efficiency by silently removing
+        # instructions a patient needs to understand.
+        return " ".join(_sentences(p["text"])[:2])
     # lifestyle / other: first sentence, trailing clause trimmed.
     return _STOP_TAIL.sub(".", _first_sentence(p["text"]))
 

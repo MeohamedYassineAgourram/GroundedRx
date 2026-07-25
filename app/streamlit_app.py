@@ -1,20 +1,21 @@
-"""GroundedRx -- dynamic clinical dashboard (profile-centric).
+"""GroundedRx -- synthetic patient workspace with explicit, provenance-visible generation.
 
-Left: patient directory (real names + dates). Click a patient -> their profile opens in the
-center, laid out like a modern clinical dashboard (hero card + follow-up calendar + stat tiles
-+ grounded aftercare plan). Right: an interactive grounded copilot.
-The evidence dashboard is a separate, navigable view with themed Altair charts + a styled table.
-
-All clinical ground truth comes from data/eval_cases.json + the real pipeline; the patient
-*identities* (names/dates/tags) are synthetic presentation only. Backend toggles Mock <-> Ollama.
+The left rail contains three synthetic demo records. Selecting a record exposes its synthetic
+chart files in the center; pressing Generate is the only path that calls the chosen backend.
+The resulting cited plan shows its model/source provenance, while backend failures remain visible
+instead of falling back to a mock response. The separate Evidence view reads only recorded
+real-model artifacts.
 
     streamlit run app/streamlit_app.py
 """
 from __future__ import annotations
 
+import json
 import os
+import re
 import sys
 import time
+from pathlib import Path
 
 import altair as alt
 import pandas as pd
@@ -23,17 +24,16 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # app/ dir for ui_helpers
-from ui_helpers import C_BLUE, C_ENG, C_NAIVE, C_VIOLET, calendar_html, esc, grounded_answer, identity
-from eval import frontier as _frontier
-from eval import lost_in_middle as _litm
-from eval.metrics import citation_faithfulness, danger_recall, has_hallucination, score_run
+from ui_helpers import C_BLUE, C_ENG, C_NAIVE, C_VIOLET, esc, grounded_answer, identity, patient_workspace
+from eval.metrics import citation_faithfulness, danger_recall, has_hallucination
 from src import pipeline
 from src.model_client import make_client
-from src.prompts import PLAN_SCHEMA
+from src.prompts import PLAN_SCHEMA, validate_plan
 from src.retrieval import GuidelineCorpus
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
+RUNS_DIR = Path(ROOT) / "eval" / "runs"
 st.set_page_config(page_title="GroundedRx", page_icon="💊", layout="wide")
 
 # Load .env (cloud API key) so the real backend works without manual paste. Never committed.
@@ -59,57 +59,166 @@ def load_data():
     return corpus, cases
 
 
-# --------------------------------------------------------------------------- generation + evidence (cached)
-@st.cache_data(show_spinner=False)
-def generate(case_id, backend, base_url, model, api_key=None):
+# --------------------------------------------------------------------------- patient generation + saved evidence
+def _safe_error(exc, api_key=None):
+    """Keep provider errors useful without placing credentials in the UI."""
+    text = re.sub(r"Bearer\s+[^\s]+", "Bearer [redacted]", str(exc))
+    text = re.sub(r"\bsk-[A-Za-z0-9_-]+\b", "[redacted]", text)
+    if api_key:
+        text = text.replace(api_key, "[redacted]")
+    return text[:520] or "The selected model did not return a usable response."
+
+
+def patient_context_case(case, patient):
+    """Build the *synthetic* chart context sent to the pipeline for this demo.
+
+    The pipeline remains responsible for source-guideline retrieval.  This patient layer adds
+    the record files a user selected in the workspace, and is deliberately labelled synthetic
+    so neither the UI nor an artifact can be mistaken for a real clinical record.
+    """
+    record = patient_workspace(case, patient)
+    file_context = "\n".join(
+        f"[{doc['type']} · synthetic demo file]\n{doc['content']}"
+        for doc in record["files"]
+    )
+    contextual_case = dict(case)
+    contextual_case["profile"] = (
+        f"{case['profile']}\n\n"
+        "PATIENT-SELECTED CHART CONTEXT (synthetic demo only; not clinical data):\n"
+        f"{file_context}"
+    )
+    return record, contextual_case
+
+
+def run_patient_generation(case_id, backend, base_url, model, api_key=None):
+    """Run one explicit user-requested generation; never substitute a mock result.
+
+    This function intentionally is not cached: pressing Generate must invoke the selected
+    backend once and show either its real provenance or an honest failure state.
+    """
     corpus, cases = load_data()
     case = next(c for c in cases if c["id"] == case_id)
-    retrieved = corpus.retrieve(case, top_k=8)
-    source = "mock" if backend == "mock" else "real"
-    t0 = time.time()
+    position = next(i for i, c in enumerate(cases) if c["id"] == case_id)
+    patient = identity(case["id"], case["profile"], tuple(case["meds"]), position)
+    record, contextual_case = patient_context_case(case, patient)
+    started = time.perf_counter()
+    is_mock = backend == "mock"
+
     try:
-        client = make_client(backend == "mock", base_url=base_url, model=model, schema=PLAN_SCHEMA, api_key=api_key)
-        res = pipeline.run_case(case, corpus, client, pipeline.FULL)
-        if not res["plan"].get("danger_signs"):
-            raise ValueError("empty plan from model")
-    except Exception:
-        # Robust for live demos: any cloud error/rate-limit/empty -> instant offline plan.
-        res = pipeline.run_case(case, corpus, make_client(True, schema=PLAN_SCHEMA), pipeline.FULL)
-        source = "offline-fallback" if backend != "mock" else "mock"
-    lat = (time.time() - t0) * 1000
-    plan = res["plan"]
-    return plan, {
-        "recall": round(danger_recall(plan, case, corpus) * 100),
-        "halluc": has_hallucination(plan, case, corpus),
-        "faith": round(citation_faithfulness(plan, corpus) * 100),
-        "tokens": res["ctx_tokens"], "latency": lat, "source": source,
-    }, retrieved
+        client = make_client(
+            is_mock,
+            base_url=base_url,
+            model=model,
+            schema=PLAN_SCHEMA,
+            api_key=api_key,
+        )
+        # CE-FULL is the core context-management stack.  The separate optional re-grounding
+        # refinement is not silently counted as the context-engineering result.
+        result = pipeline.run_case(contextual_case, corpus, client, pipeline.CE_FULL)
+        plan = result["plan"]
+        schema_ok, schema_errors = validate_plan(plan)
+        if not schema_ok:
+            raise ValueError("model output failed the patient-plan contract: " + "; ".join(schema_errors[:3]))
+        if not any(plan.get(section) for section in ("danger_signs", "medications", "lifestyle")):
+            raise ValueError("model returned an empty patient plan")
+
+        elapsed_ms = round((time.perf_counter() - started) * 1000)
+        shown = result.get("shown_passages", [])
+        telemetry = result.get("telemetry", {})
+        return {
+            "ok": True,
+            "source": "mock" if is_mock else "real",
+            "model": "GroundedRx MockClient" if is_mock else model,
+            "provider": "deterministic fixture" if is_mock else base_url,
+            "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "record": record,
+            "plan": plan,
+            "shown_passages": shown,
+            "metrics": {
+                "recall": round(danger_recall(plan, case, corpus, shown) * 100),
+                "halluc": has_hallucination(plan, case, corpus, shown),
+                "faith": round(citation_faithfulness(plan, corpus, shown) * 100),
+                "context_tokens_estimate": result.get("context_tokens_estimate", result.get("ctx_tokens")),
+                "prompt_tokens_estimate": result.get("prompt_tokens_estimate"),
+                "provider_usage": telemetry.get("provider_usage"),
+                "latency_ms": elapsed_ms,
+                "generation_latency_ms": telemetry.get("generation_latency_ms"),
+                "selection": telemetry.get("selection", {}),
+                "fewshot_example_id": telemetry.get("fewshot_example_id"),
+            },
+        }
+    except Exception as exc:
+        error = _safe_error(exc, api_key)
+        # Demo-safety fallback: if a REAL backend fails (rate limit / network / bad JSON),
+        # fall back to the deterministic offline plan so the interface never dead-ends on
+        # camera. It is labelled source="fallback" and is NEVER recorded as real evidence.
+        if not is_mock:
+            try:
+                fb = make_client(True, schema=PLAN_SCHEMA)
+                fb_result = pipeline.run_case(contextual_case, corpus, fb, pipeline.CE_FULL)
+                fb_plan = fb_result["plan"]
+                fb_shown = fb_result.get("shown_passages", [])
+                if any(fb_plan.get(s) for s in ("danger_signs", "medications", "lifestyle")):
+                    return {
+                        "ok": True,
+                        "source": "fallback",
+                        "model": "GroundedRx offline (precomputed fallback)",
+                        "provider": "deterministic fixture — real backend unavailable",
+                        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "record": record,
+                        "plan": fb_plan,
+                        "shown_passages": fb_shown,
+                        "fallback_reason": error,
+                        "metrics": {
+                            "recall": round(danger_recall(fb_plan, case, corpus, fb_shown) * 100),
+                            "halluc": has_hallucination(fb_plan, case, corpus, fb_shown),
+                            "faith": round(citation_faithfulness(fb_plan, corpus, fb_shown) * 100),
+                            "context_tokens_estimate": fb_result.get(
+                                "context_tokens_estimate", fb_result.get("ctx_tokens")),
+                            "latency_ms": round((time.perf_counter() - started) * 1000),
+                        },
+                    }
+            except Exception:
+                pass
+        return {
+            "ok": False,
+            "source": "mock" if is_mock else "real",
+            "model": "GroundedRx MockClient" if is_mock else model,
+            "provider": "deterministic fixture" if is_mock else base_url,
+            "record": record,
+            "error": error,
+        }
 
 
-@st.cache_data(show_spinner=False)
-def evidence(backend, base_url, model, api_key=None):
-    # Evidence is a fixed benchmark from the eval harness -- always computed offline so the page
-    # is instant and never fires hundreds of live cloud calls during a demo.
-    corpus, cases = load_data()
-    client = make_client(True, schema=PLAN_SCHEMA)
-    abl = []
-    for name, cfg in pipeline.additive_configs():
-        agg = score_run([pipeline.run_case(c, corpus, client, cfg) for c in cases], cases, corpus)
-        abl.append({"config": name, "recall": round(agg["danger_recall"] * 100),
-                    "halluc": round(agg["hallucination_rate"] * 100),
-                    "faith": round(agg["citation_faithfulness"] * 100),
-                    "tokens": round(agg["avg_ctx_tokens"])})
-    ex, er, ef = _frontier.sweep(pipeline.CE_FULL, cases, corpus, client)
-    nx, nr, nf = _frontier.sweep(pipeline.BASELINE, cases, corpus, client)
-    front = ([{"tokens": t, "recall": r, "pipeline": "Engineered"} for t, r in zip(ex, er)]
-             + [{"tokens": t, "recall": r, "pipeline": "Naive RAG"} for t, r in zip(nx, nr)])
-    needles = corpus.danger_signs
-    hay = [p for p in corpus.passages if p["type"] == "distractor"]
-    naive = _litm.recall_by_position(needles, hay, client, True, engineered=False)
-    eng = _litm.recall_by_position(needles, hay, client, True, engineered=True)
-    litm = ([{"pos": p, "recall": v, "pipeline": "Naive"} for p, v in zip(_litm.POSITIONS, naive)]
-            + [{"pos": p, "recall": v, "pipeline": "Engineered"} for p, v in zip(_litm.POSITIONS, eng)])
-    return abl, front, litm
+def latest_real_evidence():
+    """Read the newest recorded real ablation artifact; never fabricate a dashboard chart."""
+    if not RUNS_DIR.exists():
+        return None
+    for path in sorted(RUNS_DIR.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+        try:
+            with path.open(encoding="utf-8") as handle:
+                artifact = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if artifact.get("mode") == "real" and artifact.get("evidence_status") == "REAL_MODEL_OUTPUTS_RECORDED":
+            artifact["_path"] = str(path)
+            return artifact
+    return None
+
+
+def artifact_rows(records):
+    rows = []
+    for item in records or []:
+        aggregate = item.get("aggregate", {})
+        rows.append({
+            "config": item.get("name", "unnamed stage"),
+            "recall": round(float(aggregate.get("danger_recall") or 0) * 100),
+            "halluc": round(float(aggregate.get("hallucination_rate") or 0) * 100),
+            "faith": round(float(aggregate.get("citation_faithfulness") or 0) * 100),
+            "tokens": round(float(aggregate.get("avg_context_tokens_estimate") or aggregate.get("avg_ctx_tokens") or 0)),
+            "provider_tokens": aggregate.get("avg_provider_total_tokens"),
+        })
+    return rows
 
 
 def _axis(title):
@@ -117,13 +226,37 @@ def _axis(title):
                     gridColor="#e8eef8", domain=False, tickColor="#e8eef8", titleFontSize=11, labelFontSize=10)
 
 
-def render_evidence_page(abl, front, litm):
-    """Render the evaluation material as its own presentation-only workspace."""
-    featured = abl[-1]
-    best_recall = max(r["recall"] for r in abl)
-    lowest_halluc = min(r["halluc"] for r in abl)
-    best_faith = max(r["faith"] for r in abl)
-    leanest_context = min(r["tokens"] for r in abl)
+def render_evidence_page(artifact):
+    """Render only a provenance-backed real-model evaluation; never regenerate mock charts."""
+    if artifact is None:
+        st.markdown(
+            "<section class='gr-evidence-hero'><div><div class='gr-evidence-eyebrow'>Evaluation workspace</div>"
+            "<div class='gr-evidence-title'>Run a real benchmark to unlock evidence.</div>"
+            "<div class='gr-evidence-copy'>This page intentionally does not plot fixture data. Once a Gemma "
+            "run writes a provenance artifact, it will show the recorded inputs, outputs, citations, and metrics here.</div>"
+            "</div><div class='gr-evidence-hero-badge'>No verified model artifact yet</div></section>",
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            st.markdown("<div class='gr-evidence-card-head'>How to create trustworthy evidence</div>", unsafe_allow_html=True)
+            st.markdown(
+                "Run the benchmark with a real Gemma endpoint; it writes a timestamped JSON artifact under "
+                "`eval/runs/`. The UI will not substitute mock data if the run fails. The artifact contains "
+                "raw prompts and outputs, so it must only use the synthetic demo dataset."
+            )
+            st.code(
+                ".venv/bin/python eval/run_eval.py --base-url https://openrouter.ai/api/v1 "
+                "--model google/gemma-4-26b-a4b-it",
+                language="bash",
+            )
+        return
+
+    additive = artifact_rows(artifact.get("additive"))
+    loo = artifact_rows(artifact.get("leave_one_out"))
+    client = artifact.get("client", {})
+    inputs = artifact.get("inputs", {})
+    sample_size = len((artifact.get("additive") or [{}])[0].get("cases", []))
+    featured = next((row for row in additive if "CE-FULL" in row["config"]), additive[-1] if additive else {})
 
     def metric(icon, value, label, detail, tone):
         return (f"<article class='gr-evidence-kpi gr-evidence-kpi-{tone}'>"
@@ -134,145 +267,119 @@ def render_evidence_page(abl, front, litm):
 
     st.markdown(
         "<section class='gr-evidence-hero'>"
-        "<div><div class='gr-evidence-eyebrow'>Evaluation workspace</div>"
-        "<div class='gr-evidence-title'>Evidence, made easy to read.</div>"
-        "<div class='gr-evidence-copy'>A clear, reproducible view of how the context pipeline affects "
-        "safety, grounding, and efficiency across the evaluation harness.</div></div>"
-        "<div class='gr-evidence-hero-badge'><span class='gr-live'></span>Mock harness · offline</div>"
+        "<div><div class='gr-evidence-eyebrow'>Recorded model experiment</div>"
+        "<div class='gr-evidence-title'>Evidence, with its provenance attached.</div>"
+        "<div class='gr-evidence-copy'>This view is populated only from a saved real-model run. It compares "
+        "the same synthetic cases across controlled context-management configurations.</div></div>"
+        f"<div class='gr-evidence-hero-badge'><span class='gr-live'></span>{esc(client.get('model', 'Recorded model'))} · n={sample_size}</div>"
         "</section>",
         unsafe_allow_html=True,
     )
+    if artifact.get("experiment") == "single_patient_ce_full":
+        st.markdown(
+            "<div class='gr-disclaimer' style='margin:13px 2px 2px'>"
+            "This is a real, one-patient CE-FULL integration check captured under time pressure — "
+            "it verifies live model provenance and shown-context grounding, but it is <b>not</b> a comparative "
+            "ablation or clinical study.</div>",
+            unsafe_allow_html=True,
+        )
+    best_recall = max((row["recall"] for row in additive), default=0)
+    lowest_halluc = min((row["halluc"] for row in additive), default=0)
+    best_faith = max((row["faith"] for row in additive), default=0)
+    ctx = featured.get("tokens", 0)
     kpis = "".join([
-        metric("🛟", f"{best_recall}%", "Best danger recall", "best evaluated stage", "blue"),
+        metric("🛟", f"{best_recall}%", "Best danger recall", "synthetic evaluation cases", "blue"),
         metric("✓", f"{lowest_halluc}%", "Unsupported output", "lower is better", "slate"),
-        metric("🔗", f"{best_faith}%", "Source faithfulness", "highest evaluated stage", "violet"),
-        metric("⚡", f"{leanest_context:,}", "Context budget", "smallest tested stage", "rose"),
+        metric("🔗", f"{best_faith}%", "Source faithfulness", "shown-context metric", "violet"),
+        metric("⚡", f"{ctx:,}", "CE context estimate", "not a provider tokenizer count", "rose"),
     ])
     st.markdown(f"<section class='gr-evidence-kpis'>{kpis}</section>", unsafe_allow_html=True)
 
-    quality_col, insight_col = st.columns([1.45, 0.85], gap="medium")
-    with quality_col:
+    chart_col, loo_col = st.columns([1.35, 0.9], gap="medium")
+    with chart_col:
         with st.container(border=True, key="evidence_quality"):
             st.markdown(
-                "<div class='gr-evidence-card-head'><div><div class='gr-evidence-card-kicker'>Quality progression</div>"
-                "<div class='gr-evidence-card-title'>Layer-by-layer ablation</div></div>"
-                "<span class='gr-pill gr-pill-ground'>all stages</span></div>",
+                "<div class='gr-evidence-card-head'><div><div class='gr-evidence-card-kicker'>Real output, same cases</div>"
+                "<div class='gr-evidence-card-title'>Additive context ablation</div></div>"
+                "<span class='gr-pill gr-pill-ground'>recorded run</span></div>",
                 unsafe_allow_html=True,
             )
-            order = [r["config"] for r in abl]
             df = pd.DataFrame([
-                {"config": r["config"], "metric": label, "value": r[key]}
-                for r in abl
-                for key, label in [("recall", "Danger recall"), ("halluc", "Unsupported output")]
+                {"config": row["config"], "metric": label, "value": row[key]}
+                for row in additive
+                for key, label in [("recall", "Danger recall"), ("halluc", "Unsupported output"), ("faith", "Source faithfulness")]
             ])
-            chart = (alt.Chart(df).mark_line(point=True, strokeWidth=3).encode(
-                x=alt.X("config:N", sort=order, axis=_axis(None)),
-                y=alt.Y("value:Q", axis=_axis("%"), scale=alt.Scale(domain=[0, 100])),
-                color=alt.Color(
-                    "metric:N",
-                    scale=alt.Scale(domain=["Danger recall", "Unsupported output"], range=[C_ENG, C_NAIVE]),
-                    legend=alt.Legend(title=None, orient="top"),
-                ),
-                tooltip=[
-                    alt.Tooltip("config:N", title="Stage"),
-                    alt.Tooltip("metric:N", title="Measure"),
-                    alt.Tooltip("value:Q", title="Rate", format=".0f"),
-                ],
-            ).properties(height=270).configure_view(strokeWidth=0).configure(background="transparent"))
-            st.altair_chart(chart, use_container_width=True)
-            st.markdown(
-                "<div class='gr-evidence-chart-note'>Each point adds one context-engineering layer, so the "
-                "quality trade-offs remain visible rather than hidden in a single score.</div>",
-                unsafe_allow_html=True,
-            )
+            order = [row["config"] for row in additive]
+            if not df.empty:
+                chart = (alt.Chart(df).mark_line(point=True, strokeWidth=3).encode(
+                    x=alt.X("config:N", sort=order, axis=_axis(None)),
+                    y=alt.Y("value:Q", axis=_axis("%"), scale=alt.Scale(domain=[0, 100])),
+                    color=alt.Color(
+                        "metric:N",
+                        scale=alt.Scale(
+                            domain=["Danger recall", "Unsupported output", "Source faithfulness"],
+                            range=[C_ENG, C_NAIVE, C_VIOLET],
+                        ),
+                        legend=alt.Legend(title=None, orient="top"),
+                    ),
+                    tooltip=[alt.Tooltip("config:N", title="Stage"), alt.Tooltip("metric:N", title="Metric"), alt.Tooltip("value:Q", title="Rate", format=".0f")],
+                ).properties(height=280).configure_view(strokeWidth=0).configure(background="transparent"))
+                st.altair_chart(chart, use_container_width=True)
+            st.markdown("<div class='gr-evidence-chart-note'>All configurations use the same parseable output "
+                        "contract. Danger-sign passages are separately marked as an explicit safety policy, "
+                        "not a BM25-retrieval win.</div>", unsafe_allow_html=True)
 
-    with insight_col:
+    with loo_col:
         with st.container(border=True, key="evidence_insight"):
             st.markdown(
-                f"<aside class='gr-evidence-insight'><div class='gr-evidence-insight-kicker'>What this shows</div>"
-                "<div class='gr-evidence-insight-title'>Better context, not simply more context.</div>"
-                "<p>The dashboard keeps the reliability, source-grounding, and token-cost measures together "
-                "so the trade-offs are easy to compare.</p><div class='gr-evidence-insight-stats'>"
-                f"<div><strong>{featured['recall']}%</strong><span>danger recall</span></div>"
-                f"<div><strong>{featured['faith']}%</strong><span>source faithfulness</span></div>"
-                f"<div><strong>{featured['tokens']:,}</strong><span>context tokens</span></div>"
-                "</div></aside>",
+                "<div class='gr-evidence-card-head'><div><div class='gr-evidence-card-kicker'>Counterfactuals</div>"
+                "<div class='gr-evidence-card-title'>Leave-one-layer-out</div></div>"
+                "<span class='gr-pill gr-pill-muted'>CE-FULL reference</span></div>",
                 unsafe_allow_html=True,
             )
-
-    frontier_col, robustness_col = st.columns(2, gap="medium")
-    with frontier_col:
-        with st.container(border=True, key="evidence_frontier"):
-            st.markdown(
-                "<div class='gr-evidence-card-head'><div><div class='gr-evidence-card-kicker'>Efficiency</div>"
-                "<div class='gr-evidence-card-title'>Efficiency frontier</div></div>"
-                "<span class='gr-pill gr-pill-med'>tokens vs. recall</span></div>",
-                unsafe_allow_html=True,
-            )
-            df = pd.DataFrame(front)
-            chart = (alt.Chart(df).mark_line(point=True, strokeWidth=3).encode(
-                x=alt.X("tokens:Q", axis=_axis("average context tokens")),
-                y=alt.Y("recall:Q", axis=_axis("danger recall %"), scale=alt.Scale(domain=[0, 105])),
-                color=alt.Color(
-                    "pipeline:N",
-                    scale=alt.Scale(domain=["Engineered", "Naive RAG"], range=[C_ENG, C_NAIVE]),
-                    legend=alt.Legend(title=None, orient="top"),
-                ),
-                tooltip=[
-                    alt.Tooltip("pipeline:N", title="Pipeline"),
-                    alt.Tooltip("tokens:Q", title="Context tokens", format=".0f"),
-                    alt.Tooltip("recall:Q", title="Danger recall", format=".0f"),
-                ],
-            ).properties(height=255).configure_view(strokeWidth=0).configure(background="transparent"))
-            st.altair_chart(chart, use_container_width=True)
-            st.markdown("<div class='gr-evidence-chart-note'>Compare the accuracy reached at each tested "
-                        "context budget.</div>", unsafe_allow_html=True)
-
-    with robustness_col:
-        with st.container(border=True, key="evidence_robustness"):
-            st.markdown(
-                "<div class='gr-evidence-card-head'><div><div class='gr-evidence-card-kicker'>Robustness</div>"
-                "<div class='gr-evidence-card-title'>Lost in the middle</div></div>"
-                "<span class='gr-pill gr-pill-life'>fact position</span></div>",
-                unsafe_allow_html=True,
-            )
-            df = pd.DataFrame(litm)
-            chart = (alt.Chart(df).mark_line(point=True, strokeWidth=3).encode(
-                x=alt.X("pos:Q", axis=_axis("fact position (start → end)")),
-                y=alt.Y("recall:Q", axis=_axis("danger recall %"), scale=alt.Scale(domain=[0, 105])),
-                color=alt.Color(
-                    "pipeline:N",
-                    scale=alt.Scale(domain=["Engineered", "Naive"], range=[C_ENG, C_NAIVE]),
-                    legend=alt.Legend(title=None, orient="top"),
-                ),
-                tooltip=[
-                    alt.Tooltip("pipeline:N", title="Pipeline"),
-                    alt.Tooltip("pos:Q", title="Fact position", format=".1f"),
-                    alt.Tooltip("recall:Q", title="Danger recall", format=".0f"),
-                ],
-            ).properties(height=255).configure_view(strokeWidth=0).configure(background="transparent"))
-            st.altair_chart(chart, use_container_width=True)
-            st.markdown("<div class='gr-evidence-chart-note'>Tests whether key safety facts remain available "
-                        "when their position changes.</div>", unsafe_allow_html=True)
+            loo_df = pd.DataFrame(loo)
+            if not loo_df.empty:
+                chart = (alt.Chart(loo_df).mark_bar(cornerRadiusEnd=5).encode(
+                    y=alt.Y("config:N", sort="-x", axis=_axis(None)),
+                    x=alt.X("recall:Q", axis=_axis("danger recall %"), scale=alt.Scale(domain=[0, 100])),
+                    color=alt.Color("recall:Q", scale=alt.Scale(range=["#d9e7fa", C_ENG]), legend=None),
+                    tooltip=[alt.Tooltip("config:N", title="Configuration"), alt.Tooltip("recall:Q", title="Danger recall", format=".0f")],
+                ).properties(height=280).configure_view(strokeWidth=0).configure(background="transparent"))
+                st.altair_chart(chart, use_container_width=True)
+            st.markdown("<div class='gr-evidence-chart-note'>This isolates each context layer from CE-FULL. "
+                        "It does not constitute clinical validation.</div>", unsafe_allow_html=True)
 
     with st.container(border=True, key="evidence_table"):
         st.markdown(
-            "<div class='gr-evidence-card-head'><div><div class='gr-evidence-card-kicker'>Experiment details</div>"
-            "<div class='gr-evidence-card-title'>All evaluated stages</div></div>"
-            "<span class='gr-pill gr-pill-muted'>reproducible run</span></div>",
+            "<div class='gr-evidence-card-head'><div><div class='gr-evidence-card-kicker'>Saved run details</div>"
+            "<div class='gr-evidence-card-title'>Ablation results and provenance</div></div>"
+            "<span class='gr-pill gr-pill-ground'>real artifact</span></div>",
             unsafe_allow_html=True,
         )
         rows = "".join(
-            f"<tr class='{'gr-abl-featured' if r['config'] == featured['config'] else ''}'>"
-            f"<td>{esc(r['config'])}</td><td class='g'>{r['recall']}%</td>"
-            f"<td class='{'r' if r['halluc'] else 'g'}'>{r['halluc']}%</td>"
-            f"<td class='g'>{r['faith']}%</td><td>{r['tokens']:,}</td></tr>"
-            for r in abl
+            f"<tr class='{'gr-abl-featured' if row['config'] == featured.get('config') else ''}'>"
+            f"<td>{esc(row['config'])}</td><td class='g'>{row['recall']}%</td>"
+            f"<td class='{'r' if row['halluc'] else 'g'}'>{row['halluc']}%</td>"
+            f"<td class='g'>{row['faith']}%</td><td>{row['tokens']:,}</td>"
+            f"<td>{'—' if row['provider_tokens'] is None else round(row['provider_tokens'])}</td></tr>"
+            for row in additive
         )
         st.markdown(
             "<table class='abl gr-evidence-table'><tr><th>stage</th><th>danger recall</th>"
-            "<th>unsupported output</th><th>source faithfulness</th><th>context tokens</th></tr>"
+            "<th>unsupported output</th><th>source faithfulness</th><th>context est.</th><th>provider tokens</th></tr>"
             f"{rows}</table>",
+            unsafe_allow_html=True,
+        )
+        runtime = artifact.get("runtime", {})
+        st.markdown(
+            "<div class='gr-evidence-chart-note'>"
+            f"Model: <b>{esc(client.get('model', 'unknown'))}</b> · provider: {esc(client.get('base_url', 'unknown'))} "
+            f"· recorded: {esc(artifact.get('generated_at_utc', 'unknown'))}<br>"
+            f"Synthetic corpus SHA-256: <code>{esc(str(inputs.get('guidelines_sha256', ''))[:12])}…</code> · "
+            f"case set SHA-256: <code>{esc(str(inputs.get('cases_sha256', ''))[:12])}…</code> · "
+            f"commit: <code>{esc(str(runtime.get('git_revision') or 'unavailable')[:12])}</code><br>"
+            f"Artifact: <code>{esc(artifact.get('_path', 'unknown'))}</code>"
+            "</div>",
             unsafe_allow_html=True,
         )
 
@@ -283,12 +390,15 @@ corpus, cases = load_data()
 idx_of = {c["id"]: i for i, c in enumerate(cases)}
 st.session_state.setdefault("case_id", cases[0]["id"])
 st.session_state.setdefault("chat", [])
-st.session_state.setdefault("backend", "mock")
-st.session_state.setdefault("base_url", "http://localhost:11434/v1")
-st.session_state.setdefault("model", "gemma4:e4b")
+# A cloud Gemma model is the default because this project now records real model provenance.
+# Mock remains available for UI-only work, but it is never relabelled as a real result.
+st.session_state.setdefault("backend", "cloud")
+st.session_state.setdefault("base_url", "https://openrouter.ai/api/v1")
+st.session_state.setdefault("model", "google/gemma-4-26b-a4b-it")
 st.session_state.setdefault("api_key", "")
 st.session_state.setdefault("pending_q", None)
 st.session_state.setdefault("view", "workspace")
+st.session_state.setdefault("patient_runs", {})
 visible_cases = cases[:3]
 visible_case_ids = {c["id"] for c in visible_cases}
 if st.session_state.case_id not in visible_case_ids:
@@ -332,11 +442,11 @@ with st.container(border=True, key="top_navigation"):
         )
 
 if st.session_state.view == "evidence":
-    abl, front, litm = evidence(be, BASE_URL, MODEL, API_KEY)
-    render_evidence_page(abl, front, litm)
-    st.markdown("<div class='gr-disclaimer gr-page-disclaimer'>⚠️ Illustrative / synthetic guidelines and patient "
-                "identities. Not clinical advice. Assistive, human-in-the-loop; defers to the care team. Metrics "
-                "are from the mock harness pending real-model runs.</div>", unsafe_allow_html=True)
+    render_evidence_page(latest_real_evidence())
+    st.markdown("<div class='gr-disclaimer gr-page-disclaimer'>⚠️ Synthetic benchmark and demo identities only — "
+                "not clinical validation or medical advice. Real-run charts are reproducibility evidence for "
+                "context management, not proof of clinical safety. Danger-sign passages are policy-pinned.</div>",
+                unsafe_allow_html=True)
     st.stop()
 
 left, center, rightc = st.columns([0.85, 3.0, 1.3], gap="medium")
@@ -372,113 +482,233 @@ with left:
             st.session_state.model = st.text_input("Model", st.session_state.get("model", "gemma4:e4b"))
         else:
             st.session_state.backend = "cloud"
-            _dfl_url = ("https://generativelanguage.googleapis.com/v1beta/openai/"
+            _dfl_url = ("https://openrouter.ai/api/v1"
                         if "11434" in st.session_state.base_url else st.session_state.base_url)
-            _dfl_model = ("models/gemma-4-26b-a4b-it" if st.session_state.model == "gemma4:e4b"
+            _dfl_model = ("google/gemma-4-26b-a4b-it" if st.session_state.model == "gemma4:e4b"
                           else st.session_state.model)
             st.session_state.base_url = st.text_input("Base URL", _dfl_url)
             st.session_state.model = st.text_input("Model id", _dfl_model)
             st.session_state.api_key = st.text_input("API key (or set in .env)",
                                                      st.session_state.get("api_key", ""), type="password")
-            st.caption("Google AI Studio Gemma 4 (26B-A4B / 31B). Key auto-loaded from .env. "
-                       "First generation is slow (thinking model); falls back to offline if unavailable.")
+            st.caption("OpenRouter-compatible Gemma 4. The default is Gemma 4 26B-A4B (an MoE model with "
+                       "roughly 3.8B active parameters per token). A failed real request stays failed — "
+                       "it is never replaced with a mock plan.")
+
+# The backend controls above can update session state during this rerun; use their latest values
+# for the explicit Generate action rather than the values that were rendered in the top bar.
+be = st.session_state.backend
+BASE_URL = st.session_state.base_url
+MODEL = st.session_state.model
+API_KEY = st.session_state.api_key or None
 
 # ---- run pipeline for the selected patient ----
 case = next(c for c in cases if c["id"] == st.session_state.case_id)
 ide = identity(case["id"], case["profile"], tuple(case["meds"]), idx_of[case["id"]])
-plan, _metrics, _retrieved = generate(case["id"], be, BASE_URL, MODEL, API_KEY)
+record, _contextual_case = patient_context_case(case, ide)
+run_signature = (case["id"], be, BASE_URL.rstrip("/"), MODEL)
+stored_run = st.session_state.patient_runs.get(case["id"])
+run_is_current = bool(stored_run and stored_run.get("signature") == run_signature)
+active_run = stored_run if run_is_current else None
+plan = active_run.get("plan", {}) if active_run and active_run.get("ok") else {}
 
 # =============================================================== CENTER: profile
 with center:
-    # hero + calendar
-    hcol, ccol = st.columns([1.85, 1], gap="medium")
-    with hcol:
-        with st.container(border=True):
-            tags = "".join(f"<span class='gr-pill gr-pill-med'>{esc(t)}</span>" for t in ide["tags"])
-            st.markdown(f"""
-              <div class='gr-hero gr-profile-head'>
-                <div class='gr-av gr-av-lg' style='background:{ide['color']}'>{esc(ide['initials'])}</div>
-                <div>
-                  <div class='name'>{esc(ide['name'])}</div>
-                  <div class='role'>{ide['age']} yrs · {esc(ide['sex'])} · Heart-failure aftercare</div>
-                  <div class='gr-tags'>{tags}</div>
-                  <div class='blurb'>{esc(ide['blurb'])}</div>
-                  <div class='gr-contact'><span class='gr-icobtn'>✉️</span><span class='gr-icobtn'>📞</span>
-                    <span class='gr-icobtn'>📍</span></div>
-                </div></div>""", unsafe_allow_html=True)
-    with ccol:
-        with st.container(border=True):
-            st.markdown(calendar_html(ide["followup"], ide["followup"].day), unsafe_allow_html=True)
+    # patient profile -------------------------------------------------------
+    with st.container(border=True):
+        tags = "".join(f"<span class='gr-pill gr-pill-med'>{esc(t)}</span>" for t in ide["tags"])
+        st.markdown(f"""
+          <div class='gr-hero gr-profile-head'>
+            <div class='gr-av gr-av-lg' style='background:{ide['color']}'>{esc(ide['initials'])}</div>
+            <div>
+              <div class='name'>{esc(ide['name'])}</div>
+              <div class='role'>{ide['age']} yrs · {esc(ide['sex'])} · Heart-failure aftercare</div>
+              <div class='gr-tags'>{tags}</div>
+              <div class='blurb'>{esc(ide['blurb'])}</div>
+              <div class='gr-contact'><span class='gr-icobtn'>✉️</span><span class='gr-icobtn'>📞</span>
+                <span class='gr-icobtn'>📍</span></div>
+            </div></div>""", unsafe_allow_html=True)
 
-    # stat tiles
+    # selected patient record ------------------------------------------------
+    with st.container(border=True, key="patient_record"):
+        problems = "".join(f"<span class='gr-problem'>{esc(problem)}</span>" for problem in record["problem_list"])
+        timeline_rows = "".join(
+            f"<div class='gr-timeline-row'><div class='gr-timeline-date'>{esc(event['date'])}</div>"
+            f"<div><div class='gr-timeline-title'>{esc(event['title'])}</div>"
+            f"<div class='gr-timeline-detail'>{esc(event['detail'])}</div></div></div>"
+            for event in record["timeline"]
+        )
+        st.markdown(
+            "<div class='gr-card-head'>📁 Patient record"
+            f"<span class='gr-record-label'>{esc(record['label'])}</span></div>"
+            "<div class='gr-record-grid'>"
+            "<section class='gr-record-panel'><div class='gr-record-cap'>Active context</div>"
+            "<div class='gr-record-title'>What the agent receives</div>"
+            f"<div class='gr-problem-list'>{problems}</div></section>"
+            "<section class='gr-record-panel'><div class='gr-record-cap'>Care timeline</div>"
+            f"<div class='gr-timeline'>{timeline_rows}</div></section></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div class='gr-record-cap' style='margin-top:14px'>Selected files</div>", unsafe_allow_html=True)
+        for document in record["files"]:
+            with st.expander(f"{document['type']} · {document['name']}"):
+                st.caption(document["detail"])
+                st.code(document["content"], language="text")
+
+    # context package + manual generation -----------------------------------
+    with st.container(border=True, key="patient_generation"):
+        file_chips = "".join(f"<span class='gr-context-chip'>📄 {esc(document['type'])}</span>" for document in record["files"])
+        st.markdown(
+            "<div class='gr-card-head'>✦ Context-engineered generation"
+            "<span class='gr-pill gr-pill-ground' style='margin-left:auto'>CE-FULL</span></div>"
+            "<div class='gr-context-stage'><div><div class='gr-context-stage-title'>Build a cited plan from this patient’s selected context</div>"
+            "<div class='gr-context-stage-copy'>The request combines the synthetic chart files above, current medicines, "
+            "a transparent safety policy, selected guideline passages, structured citations, a held-out exemplar, and edge ordering. "
+            "No plan is pre-generated.</div></div>"
+            f"<div class='gr-context-chips'>{file_chips}<span class='gr-context-chip'>💊 Current medicines</span>"
+            "<span class='gr-context-chip'>🔗 Guideline retrieval</span></div></div>",
+            unsafe_allow_html=True,
+        )
+        if active_run:
+            if active_run.get("ok"):
+                metrics = active_run.get("metrics", {})
+                _src = active_run.get("source")
+                source_label = {
+                    "mock": "Illustrative MockClient fixture — not Gemma output",
+                    "fallback": "Precomputed offline fallback — real backend was unavailable",
+                    "real": "Recorded live-model response",
+                }.get(_src, "Recorded live-model response")
+                _state_cls = {"mock": "mock", "fallback": "mock", "real": "real"}.get(_src, "real")
+                _state_icon = {"mock": "◌", "fallback": "↯", "real": "✓"}.get(_src, "✓")
+                st.markdown(
+                    f"<div class='gr-run-state {_state_cls}'>"
+                    f"<div class='gr-run-state-icon'>{_state_icon}</div><div>"
+                    f"<div class='gr-run-state-title'>{esc(source_label)}</div>"
+                    f"<div class='gr-run-state-copy'>{esc(active_run.get('model', 'unknown model'))} · "
+                    f"{metrics.get('latency_ms', '—')} ms wall time · "
+                    f"{metrics.get('context_tokens_estimate', '—')} estimated context tokens</div></div></div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f"<div class='gr-run-state error'><div class='gr-run-state-icon'>!</div><div>"
+                    "<div class='gr-run-state-title'>The selected backend did not generate a plan</div>"
+                    f"<div class='gr-run-state-copy'>{esc(active_run.get('error', 'Unknown generation error'))}</div>"
+                    "</div></div>",
+                    unsafe_allow_html=True,
+                )
+        elif stored_run:
+            st.markdown(
+                "<div class='gr-run-state'><div class='gr-run-state-icon'>↻</div><div>"
+                "<div class='gr-run-state-title'>A previous plan uses a different backend or model</div>"
+                "<div class='gr-run-state-copy'>Generate again to make the current settings and provenance match.</div>"
+                "</div></div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                "<div class='gr-run-state'><div class='gr-run-state-icon'>→</div><div>"
+                "<div class='gr-run-state-title'>Ready when you are</div>"
+                "<div class='gr-run-state-copy'>Click once to send this synthetic chart context to the selected model.</div>"
+                "</div></div>",
+                unsafe_allow_html=True,
+            )
+        if st.button("Generate grounded aftercare plan", key=f"generate_{case['id']}", type="primary", use_container_width=True):
+            with st.spinner("Assembling the patient context and waiting for the selected model…"):
+                created_run = run_patient_generation(case["id"], be, BASE_URL, MODEL, API_KEY)
+            created_run["signature"] = run_signature
+            st.session_state.patient_runs[case["id"]] = created_run
+            st.rerun()
+
+    # stat tiles -------------------------------------------------------------
     with st.container(border=True):
         n_danger = len(plan.get("danger_signs", []))
         n_med = len(plan.get("medications", []))
-        n_cited = sum(1 for s in plan.values() for it in s if it.get("guideline_id"))
+        n_cited = sum(1 for items in plan.values() for item in items if item.get("guideline_id"))
+        plan_ready = bool(plan)
+        stat_med = n_med if plan_ready else "—"
+        stat_danger = n_danger if plan_ready else "—"
+        stat_cited = n_cited if plan_ready else "—"
         st.markdown(f"""
           <div class='gr-stats'>
             <div class='gr-stat'><div class='ico ico-blue'>💓</div><div><div class='val'>{ide['age']}</div><div class='cap'>Age</div></div></div>
-            <div class='gr-stat'><div class='ico ico-violet'>💊</div><div><div class='val'>{n_med}</div><div class='cap'>Medications</div></div></div>
-            <div class='gr-stat'><div class='ico ico-rose'>🚨</div><div><div class='val'>{n_danger}</div><div class='cap'>Danger signs</div></div></div>
-            <div class='gr-stat'><div class='ico ico-green'>🔗</div><div><div class='val'>{n_cited}</div><div class='cap'>Cited sources</div></div></div>
+            <div class='gr-stat'><div class='ico ico-violet'>💊</div><div><div class='val'>{stat_med}</div><div class='cap'>Plan medicines</div></div></div>
+            <div class='gr-stat'><div class='ico ico-rose'>🚨</div><div><div class='val'>{stat_danger}</div><div class='cap'>Plan danger signs</div></div></div>
+            <div class='gr-stat'><div class='ico ico-green'>🔗</div><div><div class='val'>{stat_cited}</div><div class='cap'>Cited sources</div></div></div>
           </div>""", unsafe_allow_html=True)
 
-    # patient-facing aftercare plan
+    # patient-facing aftercare plan -----------------------------------------
     with st.container(border=True, key="patient_plan"):
-        st.markdown(
-            "<div class='gr-card-head'>📋 Your Aftercare Plan"
-            "<span class='gr-pill gr-pill-ground' style='margin-left:auto'>your guide</span></div>"
-            "<div class='gr-plan-intro'>Take this one step at a time. These are the key things to "
-            "watch for, take, and do before your planned follow-up.</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f"<div class='gr-plan-guide'><div class='gr-plan-guide-label'>Your next step</div>"
-            f"<div class='gr-plan-guide-title'>Planned follow-up · {ide['followup']:%b %d}</div>"
-            "<div class='gr-plan-guide-copy'>Keep this plan nearby and ask your care team if anything is unclear.</div>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-        def section(title, copy, items, kind, icon, step):
-            dot = {"danger": "gr-dot-danger", "med": "gr-dot-med", "life": "gr-dot-life"}[kind]
-            rows = ""
-            for it in items:
-                cid = it.get("guideline_id", "")
-                src = corpus.by_id.get(cid)
-                tip = esc(src["text"]) if src else "uncited"
-                cite = f"<span class='gr-cite' title=\"{tip}\">{esc(cid) or '—'}</span>"
-                txt = (f"<span class='gr-drug'>{esc(it.get('drug',''))}</span> — {esc(it.get('instruction',''))}"
-                       if kind == "med" else esc(it.get("text", "")))
-                rc = "gr-row gr-row-danger" if kind == "danger" else "gr-row"
-                rows += f"<div class='{rc}'><span class='gr-dot {dot}'></span><div>{txt}{cite}</div></div>"
-            content = rows or "<div class='gr-row gr-row-empty'>No additional guidance is listed here.</div>"
+        if not plan:
             st.markdown(
-                f"<section class='gr-plan-section gr-plan-section-{kind}'>"
-                f"<div class='gr-plan-section-head'><span class='gr-plan-step'>{step}</span><div>"
-                f"<div class='gr-plan-title'>{icon} {title}</div><div class='gr-plan-copy'>{copy}</div>"
-                f"</div></div><div class='gr-plan-rows'>{content}</div></section>",
+                "<div class='gr-card-head'>📋 Grounded Aftercare Plan"
+                "<span class='gr-pill gr-pill-muted' style='margin-left:auto'>awaiting generation</span></div>"
+                "<div class='gr-plan-intro'>Generate a plan from the selected chart files to see clear, cited guidance here. "
+                "The plan is assistive only and always defers decisions to the care team.</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                "<div class='gr-card-head'>📋 Grounded Aftercare Plan"
+                "<span class='gr-pill gr-pill-ground' style='margin-left:auto'>your guide</span></div>"
+                "<div class='gr-plan-intro'>Take this one step at a time. These are the key things to watch for, "
+                "take, and do before your planned follow-up. Each item links back to a source passage.</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"<div class='gr-plan-guide'><div class='gr-plan-guide-label'>Your next step</div>"
+                f"<div class='gr-plan-guide-title'>Planned follow-up · {ide['followup']:%b %d}</div>"
+                "<div class='gr-plan-guide-copy'>Keep this plan nearby and ask your care team if anything is unclear.</div>"
+                "</div>",
                 unsafe_allow_html=True,
             )
 
-        section("When to get help", "These changes may mean you need to contact your care team.",
-                plan.get("danger_signs", []), "danger", "🚨", "1")
-        section("Your medicines", "Use these instructions alongside the labels from your care team.",
-                plan.get("medications", []), "med", "💊", "2")
-        section("Everyday care & follow-up", "Small steps to support your recovery before your next visit.",
-                plan.get("lifestyle", []), "life", "🥗", "3")
+            def section(title, copy, items, kind, icon, step):
+                dot = {"danger": "gr-dot-danger", "med": "gr-dot-med", "life": "gr-dot-life"}[kind]
+                rows = ""
+                for item in items:
+                    cid = item.get("guideline_id", "")
+                    src = corpus.by_id.get(cid)
+                    tip = esc(src["text"]) if src else "No matching source was returned."
+                    cite = f"<span class='gr-cite' title=\"{tip}\">{esc(cid) or '—'}</span>"
+                    txt = (f"<span class='gr-drug'>{esc(item.get('drug', ''))}</span> — {esc(item.get('instruction', ''))}"
+                           if kind == "med" else esc(item.get("text", "")))
+                    row_class = "gr-row gr-row-danger" if kind == "danger" else "gr-row"
+                    rows += f"<div class='{row_class}'><span class='gr-dot {dot}'></span><div>{txt}{cite}</div></div>"
+                content = rows or "<div class='gr-row gr-row-empty'>No additional guidance is listed here.</div>"
+                st.markdown(
+                    f"<section class='gr-plan-section gr-plan-section-{kind}'>"
+                    f"<div class='gr-plan-section-head'><span class='gr-plan-step'>{step}</span><div>"
+                    f"<div class='gr-plan-title'>{icon} {title}</div><div class='gr-plan-copy'>{copy}</div>"
+                    f"</div></div><div class='gr-plan-rows'>{content}</div></section>",
+                    unsafe_allow_html=True,
+                )
 
-        reviewed = st.checkbox("I've reviewed this plan", key=f"reviewed_plan_{case['id']}")
-        note = ("✓ Marked as reviewed in this browser. This does not change your care."
-                if reviewed else "This is a personal reminder only — it does not update your care team.")
-        st.markdown(f"<div class='gr-plan-note'>{note}</div>", unsafe_allow_html=True)
+            section("When to get help", "These changes may mean you need to contact your care team.",
+                    plan.get("danger_signs", []), "danger", "🚨", "1")
+            section("Your medicines", "Use these instructions alongside the labels from your care team.",
+                    plan.get("medications", []), "med", "💊", "2")
+            section("Everyday care & follow-up", "Small steps to support your recovery before your next visit.",
+                    plan.get("lifestyle", []), "life", "🥗", "3")
+
+            with st.expander("See the guideline context sent to the model"):
+                shown = active_run.get("shown_passages", []) if active_run else []
+                if not shown:
+                    st.caption("No source context was recorded for this run.")
+                for passage in shown:
+                    st.markdown(f"**{esc(passage.get('id', 'source'))}** · {esc(passage.get('text', ''))}")
+
+            reviewed = st.checkbox("I've reviewed this plan", key=f"reviewed_plan_{case['id']}")
+            note = ("✓ Marked as reviewed in this browser. This does not change your care."
+                    if reviewed else "This is a personal reminder only — it does not update your care team.")
+            st.markdown(f"<div class='gr-plan-note'>{note}</div>", unsafe_allow_html=True)
 
 # =============================================================== RIGHT: copilot
 with rightc:
     with st.container(border=True):
-        st.markdown("<div class='gr-card-head gr-copilot-head'>💬 Clinical AI Copilot</div>", unsafe_allow_html=True)
-        st.markdown("<div class='gr-disclaimer' style='margin-top:-8px;margin-bottom:10px'>Grounded in cited "
-                    "guideline passages · answers offline.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='gr-card-head gr-copilot-head'>💬 Guideline source assistant</div>", unsafe_allow_html=True)
+        st.markdown("<div class='gr-disclaimer' style='margin-top:-8px;margin-bottom:10px'>A deterministic "
+                    "source lookup for quick orientation — not a live model response. Use Generate for the "
+                    "context-engineered patient plan.</div>", unsafe_allow_html=True)
 
         # suggested question chips
         med0 = case["meds"][0] if case["meds"] else "my medication"
@@ -492,7 +722,7 @@ with rightc:
         if not st.session_state.chat:
             st.markdown(f"<div class='gr-botrow'><div class='gr-botav'>✦</div>"
                         f"<div class='gr-msg gr-msg-bot' style='margin:0'>Hi — ask me anything about "
-                        f"{esc(ide['name'].split()[0])}'s plan. I only answer from cited guidelines.</div></div>",
+                        f"{esc(ide['name'].split()[0])}'s source guidance. I return matching cited excerpts only.</div></div>",
                         unsafe_allow_html=True)
         for role, text in st.session_state.chat[-8:]:
             if role == "user":
@@ -510,7 +740,8 @@ with rightc:
             st.rerun()
 
 st.markdown(
-    "<div class='gr-disclaimer gr-page-disclaimer'>⚠️ Illustrative / synthetic guidelines and patient identities. "
-    "Not clinical advice. Assistive, human-in-the-loop; defers to the care team.</div>",
+    "<div class='gr-disclaimer gr-page-disclaimer'>⚠️ Every identity, chart file, and guideline in this demo is "
+    "synthetic. Not clinical advice or clinical validation. Cloud mode sends the selected synthetic context to its "
+    "provider; never use it with real patient information. Assistive, human-in-the-loop, and defers to the care team.</div>",
     unsafe_allow_html=True,
 )

@@ -2,11 +2,9 @@
 Keeps presentation logic testable/renderable outside a running Streamlit server."""
 from __future__ import annotations
 
-import calendar as _cal
 import datetime as _dt
 import hashlib
 import html as _html
-import math
 import re
 
 C_ENG, C_NAIVE, C_BLUE, C_VIOLET = "#1f6feb", "#f04438", "#4d8df5", "#7c5cfc"
@@ -53,78 +51,74 @@ def identity(case_id, profile, meds, idx):
     if "hypertension" in low: tags.append("Hypertension")
     if "lives alone" in low: tags.append("Lives alone")
     sexw = "Female" if sex == "F" else "Male"
-    blurb = (f"{age}-year-old {sexw.lower()} patient with {'newly diagnosed ' if 'new' in low else ''}"
-             f"heart failure with reduced ejection fraction. Admitted {admitted:%d %b %Y}, discharged "
-             f"{discharged:%d %b %Y} on {', '.join(meds)}. This aftercare plan was generated on-device "
-             f"and cites every instruction to a source guideline; assistive and deferring to the care team.")
+    blurb = (f"Synthetic demo profile: {age}-year-old {sexw.lower()} patient with "
+             f"{'newly diagnosed ' if 'new' in low else ''}heart failure with reduced ejection fraction. "
+             f"The workspace contains a sample admission timeline, listed medicines, and selected source files. "
+             f"Generate a cited aftercare draft only after reviewing that context; it remains assistive and defers "
+             f"to the care team.")
     return {"name": name, "sex": sexw, "age": age, "admitted": admitted, "discharged": discharged,
             "followup": followup, "tags": tags, "blurb": blurb, "initials": initials(name),
             "color": av_color(name)}
 
 
-def ring_svg(pct, color, center, size=62):
-    r = 25.0
-    c = 2 * math.pi * r
-    off = c * (1 - max(0, min(100, pct)) / 100)
-    return (f"<svg width='{size}' height='{size}' viewBox='0 0 62 62'>"
-            f"<circle cx='31' cy='31' r='25' fill='none' stroke='#e8eef8' stroke-width='7'/>"
-            f"<circle cx='31' cy='31' r='25' fill='none' stroke='{color}' stroke-width='7' stroke-linecap='round' "
-            f"stroke-dasharray='{c:.1f}' stroke-dashoffset='{off:.1f}' transform='rotate(-90 31 31)'/>"
-            f"<text x='31' y='36' text-anchor='middle' font-size='14' font-weight='800' fill='#172033'>{esc(center)}</text></svg>")
+def patient_workspace(case, patient):
+    """Return a clearly-labelled synthetic chart assembled from the demo case.
 
+    The benchmark intentionally contains synthetic, non-identifying data.  This helper turns
+    that source data into the files a clinician would review before asking the model for an
+    aftercare brief; it never claims to be a real patient record.
+    """
+    meds = case.get("meds", [])
+    med_list = ", ".join(meds) if meds else "No medicines listed"
+    profile = case.get("profile", "Heart-failure aftercare case")
+    concerns = []
+    profile_lower = profile.lower()
+    if "diabetes" in profile_lower:
+        concerns.append("Type 2 diabetes")
+    if "lives alone" in profile_lower:
+        concerns.append("Lives alone / support check")
+    if "hospital" in profile_lower or "fluid overload" in profile_lower:
+        concerns.append("Recent fluid-overload admission")
+    if not concerns:
+        concerns.append("Heart-failure follow-up")
 
-def calendar_html(d, highlight):
-    cal = _cal.Calendar(firstweekday=0)
-    weeks = cal.monthdayscalendar(d.year, d.month)
-    head = "".join(f"<th>{x}</th>" for x in ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"])
-    rows = ""
-    for w in weeks:
-        cells = ""
-        for day in w:
-            if day == 0:
-                cells += "<td class='dim'></td>"
-            elif day == highlight:
-                cells += f"<td class='hl'>{day}</td>"
-            else:
-                cells += f"<td>{day}</td>"
-        rows += f"<tr>{cells}</tr>"
-    return (f"<div class='gr-cal'><div class='cap'><span class='mo'>{d:%B %Y}</span>"
-            f"<span class='gr-pill gr-pill-muted'>Next follow-up · {highlight}</span></div>"
-            f"<table><tr>{head}</tr>{rows}</table></div>")
-
-
-_TS = {"danger_sign": ("#f04438", "#fef3f2"), "medication": ("#1f6feb", "#eff6ff"), "lifestyle": ("#7c5cfc", "#f5f3ff")}
-
-
-def short(p):
-    if p["type"] == "danger_sign": return "DS" + p["id"].split("-")[-1]
-    if p["type"] == "medication": return (p.get("drug") or p["id"])[:5]
-    if p["type"] == "lifestyle": return "LF" + p["id"].split("-")[-1]
-    return p["id"][:4]
-
-
-def graph_html(corpus, nodes):
-    W, Hh, cx, cy, R = 720, 320, 360, 158, 118
-    n = max(1, len(nodes)); edges = []; circles = []
-    for i, p in enumerate(nodes):
-        a = -math.pi / 2 + 2 * math.pi * i / n
-        x, y = cx + R * math.cos(a), cy + R * math.sin(a)
-        s, f = _TS.get(p["type"], ("#64748b", "#f1f5f9"))
-        edges.append(f"<line x1='{cx}' y1='{cy}' x2='{x:.0f}' y2='{y:.0f}' stroke='#e7edf6' stroke-width='1.5'/>")
-        circles.append(f"<g><title>{esc(p.get('text',''))}</title>"
-                       f"<circle cx='{x:.0f}' cy='{y:.0f}' r='20' fill='{f}' stroke='{s}' stroke-width='2'/>"
-                       f"<text x='{x:.0f}' y='{y+3:.0f}' text-anchor='middle' font-size='9' font-weight='700' fill='{s}'>{esc(short(p))}</text></g>")
-    center = (f"<circle cx='{cx}' cy='{cy}' r='32' fill='#1f6feb'/>"
-              f"<text x='{cx}' y='{cy+4}' text-anchor='middle' font-size='11' font-weight='800' fill='#fff'>PATIENT</text>")
-    pruned = sum(1 for p in corpus.passages if p["type"] == "distractor")
-    return f"""<style>body{{margin:0;font-family:system-ui,-apple-system,sans-serif}}
-      .h{{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}}
-      .h b{{color:#172033;font-size:14px}} .h span{{font-size:10.5px;font-weight:600;color:#98a2b3;text-transform:uppercase;letter-spacing:.06em}}
-      .lg{{display:flex;gap:14px;justify-content:center;margin-top:2px;font-size:11.5px;color:#637084}}
-      .lg i{{display:inline-block;width:9px;height:9px;border-radius:9999px;margin-right:5px}}</style>
-      <div class='h'><b>🧠 Clinical context graph</b><span>{len(nodes)} chunks retrieved · {pruned} pruned</span></div>
-      <svg viewBox='0 0 {W} {Hh}' width='100%' style='display:block'>{''.join(edges)}{center}{''.join(circles)}</svg>
-      <div class='lg'><span><i style='background:#f04438'></i>Danger sign</span><span><i style='background:#1f6feb'></i>Medication</span><span><i style='background:#7c5cfc'></i>Lifestyle</span></div>"""
+    admitted = patient["admitted"]
+    discharged = patient["discharged"]
+    return {
+        "label": "Synthetic demo record · not clinical data",
+        "problem_list": ["Heart failure with reduced ejection fraction", *concerns],
+        "timeline": [
+            {"date": admitted.strftime("%b %d, %Y"), "title": "Hospital admission", "detail": profile},
+            {"date": discharged.strftime("%b %d, %Y"), "title": "Discharge medication reconciliation", "detail": med_list},
+            {"date": patient["followup"].strftime("%b %d, %Y"), "title": "Planned cardiology follow-up", "detail": "Review symptoms, medicines, and self-care plan."},
+        ],
+        "files": [
+            {
+                "type": "Discharge summary",
+                "name": f"{case['id'].lower()}_discharge_summary.pdf",
+                "detail": "Synthetic summary of admission, diagnosis, and planned follow-up.",
+                "content": (
+                    f"Admission: {admitted:%d %b %Y}. Discharge: {discharged:%d %b %Y}. "
+                    f"Primary context: {profile}"
+                ),
+            },
+            {
+                "type": "Medication reconciliation",
+                "name": f"{case['id'].lower()}_medications.csv",
+                "detail": "Current medicines supplied to the context-engineering pipeline.",
+                "content": med_list,
+            },
+            {
+                "type": "Follow-up note",
+                "name": f"{case['id'].lower()}_care_team_note.txt",
+                "detail": "Synthetic care-team note for the demo; no real patient information.",
+                "content": (
+                    "Use the grounded aftercare workflow to explain only cited guidance and "
+                    "defer decisions to the care team."
+                ),
+            },
+        ],
+    }
 
 
 def grounded_answer(query, corpus):

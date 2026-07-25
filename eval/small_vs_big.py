@@ -79,14 +79,15 @@ def main():
         else:
             print(f"{label:>22}  {e*100:>23.0f}%  {n*100:>23.0f}%")
 
-    wins = (eng["danger_recall"] >= naive["danger_recall"]
-            and eng["hallucination_rate"] <= naive["hallucination_rate"]
-            and eng["citation_faithfulness"] >= naive["citation_faithfulness"])
-    verdict = "YES" if wins else "NO"
-    print(f"\nEngineered small model matches or beats naive larger model on every safety metric: {verdict}")
     if args.mock:
-        print("(mock: both sides are the same stub, so this shows the FULL-vs-baseline gap; "
-              "run real to compare E4B vs 12B.)")
+        print("\nSmall-vs-big verdict: NOT APPLICABLE — deterministic mock output is not a model comparison.")
+        print("(Mock mode only exercises the evaluation harness. Run two recorded real endpoints/models.)")
+    else:
+        wins = (eng["danger_recall"] >= naive["danger_recall"]
+                and eng["hallucination_rate"] <= naive["hallucination_rate"]
+                and eng["citation_faithfulness"] >= naive["citation_faithfulness"])
+        verdict = "YES" if wins else "NO"
+        print(f"\nEngineered small model matches or beats naive larger model on every safety metric: {verdict}")
 
 
 if __name__ == "__main__":

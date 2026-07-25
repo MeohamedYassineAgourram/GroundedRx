@@ -37,42 +37,54 @@ filter and hallucination went straight back to 100%. That is exactly what the de
 
 | Layer | What it does | Definition clause it satisfies | CE? |
 |---|---|---|---|
-| **Retrieval / context selection** | pull only the guideline chunks relevant to this patient's condition + meds; danger-signs always included | *external knowledge retrieval*; *structuring the information ecosystem* | ✅ core |
-| **Compression / distillation** | reduce each chunk to its high-signal clinical core (no needed fact dropped) | *designing & managing* the context under a token budget | ✅ core |
+| **Retrieval / context selection** | pull relevant guideline chunks; policy-pin danger signs and a small foundational self-care checklist, each reported separately from BM25 | *external knowledge retrieval*; *structuring the information ecosystem* | ✅ core |
+| **Compression / distillation** | reduce each chunk to its high-signal clinical core while retaining medication timing and cautions | *designing & managing* the context under a token budget | ✅ core |
 | **Locked schema (citation per claim)** | require every claim to name a source; guided decoding | *system instructions*; structuring the model's grounding | ✅ core |
 | **Dynamic few-shot** | retrieve the nearest grounded exemplar per case | *dynamic memory* | ✅ core |
 | **Ordering / budgeting** | place safety-critical facts at context edges; cap token budget | *managing* the context for position-robustness | ✅ core |
 | **Re-grounding (multi-step)** | regenerate from the re-composed managed context when a claim isn't grounded | *tool outputs during multi-step execution* | ✅ optional refinement |
 
-Nothing in the winning story is a filter that discards information. Retrieval and compression
-*select and condense* — they never drop a required danger-sign or a prescribed medication
-(danger-signs are pinned into every context; the patient's own meds are always retrieved).
+Nothing in the core claim is a post-hoc filter that deletes information. Retrieval and
+compression select and condense inputs; the evaluator records the exact shown passages so a
+claim cannot receive credit for a source it never saw.
 
 ---
 
-## The evidence that the win is context engineering (mock numbers, real pending)
+## Evaluation protocol and evidence status
 
-**Context engineering ALONE (no re-grounding), 30 cases, 74-passage corpus:**
+The repository includes a deterministic `MockClient` to exercise the interface and evaluator.
+Its behavior is intentionally programmed by configuration; **mock output is an illustrative
+fixture, never Gemma evidence**. No mock percentage belongs in a pitch or a static export.
 
-| config | danger recall | hallucination | citation faithfulness | avg ctx tokens |
-|---|---|---|---|---|
-| baseline (naive dump) | 50% | 100% | 0% | 2685 |
-| **CE-FULL (context engineering only)** | **100%** | **10%** | **99%** | **615 (−77%)** |
-| + optional re-grounding | 100% | 0% | 100% | 615 |
+Real runs use the same JSON output contract in every arm and save a timestamped provenance
+artifact under `eval/runs/` containing:
 
-**Leave-one-out over the context-engineering layers** (remove one from CE-FULL):
+- exact model / endpoint, provider-reported token usage and latency;
+- code revision plus SHA-256 hashes for the synthetic corpus and case set;
+- prompts, selected/ordered passages, policy-pinning telemetry, dynamic-example identity, raw
+  model responses, parsed plan, and per-case metrics;
+- additive and leave-one-out configurations, with optional re-grounding reported separately.
 
-| removed | danger recall | hallucination | faithfulness | tokens | what it proves |
-|---|---|---|---|---|---|
-| − retrieval | 50% | 100% | 91% | 1675 | the dominant lever: recall, safety **and** tokens all hinge on it |
-| − compression | 100% | 10% | 99% | 674 | token efficiency |
-| − schema | 100% | 10% | 0% | 588 | grounded citations |
-| − few-shot | 100% | 40% | 67% | 508 | invention-suppression + format |
+The app’s Evidence page reads only artifacts with
+`evidence_status = REAL_MODEL_OUTPUTS_RECORDED`. Before such an artifact exists, it deliberately
+shows no chart. The static exporter also refuses mock artifacts.
 
-**Small-beats-big:** engineered small model (CE-FULL) vs naively-prompted larger model — the
-engineered small model wins on *every* safety metric, at a fraction of the tokens. The gain is
-attributable to context management, not parameters and not a filter.
+### What the automatic metrics mean
 
-> All numbers above are from the `--mock` harness (a stub small model whose behavior is a
-> property of its context). They regenerate against the real Gemma 4 E4B with no code change
-> (`--base-url`/`--model`). Only measured numbers go on slides.
+| Metric | Check | Important limitation |
+|---|---|---|
+| Danger recall | required danger content matches a passage shown to the model | synthetic requirement set, not a patient-outcome measure |
+| Unsupported output | unlisted medication, forbidden term, or claim not supported by shown context | lexical/deterministic support checks still need clinician review |
+| Citation faithfulness | non-empty cited ID is shown and supports the particular claim | source support is not clinical correctness |
+| Context / provider tokens | deterministic context estimate plus provider-reported usage where available | endpoint tokenizers and hidden reasoning vary |
+
+### Honest judge framing
+
+> “This is a reproducible synthetic benchmark for grounding and context management. The chart
+> file, selected context, raw response, citations, and real-run artifact are inspectable. It is
+> not clinical validation, and safety-pinned passages are a transparent product policy rather
+> than a retrieval-quality result.”
+
+Only make a “small beats big” claim after recorded runs of both models on the same case selection
+are available. `google/gemma-4-26b-a4b-it` is an MoE model with roughly 3.8B active parameters
+per token; do not describe it as a dense 4B model.

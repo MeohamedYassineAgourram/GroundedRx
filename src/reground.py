@@ -17,8 +17,8 @@ import re
 # Generic instruction words carry no grounding signal -- a claim that only shares "take/daily"
 # with a passage is NOT grounded by it. Keying on distinctive terms stops a mis-cited drug
 # (e.g. digoxin citing the furosemide passage) from being falsely judged grounded.
-_STOP = {"take", "taken", "daily", "morning", "night", "report", "avoid", "prescribed", "care",
-         "team", "continue", "before", "after", "dose", "times", "your", "with", "food", "when",
+_STOP = {"take", "taken", "report", "avoid", "prescribed", "care",
+         "team", "continue", "before", "after", "your", "with", "food", "when",
          "this", "that", "from", "into", "each", "used", "using", "help", "keep", "make", "over"}
 
 
@@ -26,28 +26,39 @@ def _tok(text):
     return {w for w in re.findall(r"[a-z0-9]+", str(text).lower()) if len(w) > 3 and w not in _STOP}
 
 
-def _grounded(claim_text, cid, corpus):
-    """A claim is grounded iff it cites a real passage whose text actually supports it,
-    measured on distinctive (non-generic) terms."""
-    passage = corpus.by_id.get(cid)
+def _numbers(text):
+    return set(re.findall(r"(?<![a-z])\d+(?:\.\d+)?", str(text).lower()))
+
+
+def _grounded(claim_text, cid, shown_by_id):
+    """A claim is grounded iff it cites a *shown* passage whose text supports it.
+
+    Looking up the full corpus here would let a model cite material it never received and still
+    pass the re-grounding gate, which defeats the point of context management.
+    """
+    passage = shown_by_id.get(cid)
     if passage is None:
         return False
     claim_terms = _tok(claim_text)
     if not claim_terms:
         return False
     passage_terms = _tok(passage["text"] + " " + passage.get("drug", "") + " " + passage.get("concept", ""))
-    return len(claim_terms & passage_terms) / len(claim_terms) >= 0.3
+    return (
+        _numbers(claim_text) <= _numbers(passage["text"] + " " + passage.get("drug", ""))
+        and len(claim_terms & passage_terms) / len(claim_terms) >= 0.3
+    )
 
 
-def _plan_is_grounded(plan, corpus):
+def _plan_is_grounded(plan, shown_passages):
+    shown_by_id = {p.get("id"): p for p in shown_passages if p.get("id")}
     for c in plan.get("danger_signs", []):
-        if not _grounded(c.get("text", ""), c.get("guideline_id", ""), corpus):
+        if not _grounded(c.get("text", ""), c.get("guideline_id", ""), shown_by_id):
             return False
     for c in plan.get("medications", []):
-        if not _grounded(f"{c.get('drug','')} {c.get('instruction','')}", c.get("guideline_id", ""), corpus):
+        if not _grounded(f"{c.get('drug','')} {c.get('instruction','')}", c.get("guideline_id", ""), shown_by_id):
             return False
     for c in plan.get("lifestyle", []):
-        if not _grounded(c.get("text", ""), c.get("guideline_id", ""), corpus):
+        if not _grounded(c.get("text", ""), c.get("guideline_id", ""), shown_by_id):
             return False
     return True
 
@@ -57,6 +68,6 @@ def reground_plan(plan, corpus, context_passages, client, system_prompt, user_pr
     that context (a second, context-managed generation). Returns the (re)generated plan."""
     if not enabled:
         return plan
-    if _plan_is_grounded(plan, corpus):
+    if _plan_is_grounded(plan, context_passages):
         return plan  # context already did the job -- no correction needed
     return client.generate_plan(system_prompt, user_prompt, context_passages, cfg, cfg.fewshot, case, strict=True)

@@ -1,6 +1,10 @@
 """Prompt builders (baseline vs engineered) + the locked JSON schema.
 
 Layers touched here:
+  - A *shared* JSON envelope keeps every evaluation arm parseable.  This is deliberately
+    held constant so a baseline cannot lose merely because free-form prose was parsed as
+    JSON.  Layer 3 adds citation binding and grounded output constraints on top of that
+    common envelope.
   - Layer 3 (locked schema): PLAN_SCHEMA, enforced via guided/structured decoding.
   - Layer 4 (dynamic few-shot): nearest gold example injected per case.
   - Layer 6 (ordering/budgeting): safety-critical facts placed at the EDGES of context.
@@ -50,26 +54,45 @@ PLAN_SCHEMA = {
     "required": ["danger_signs", "medications", "lifestyle"],
 }
 
+# Keep output shape constant across the ablation.  Without this, a free-form baseline is
+# parsed as an empty plan while the engineered arm gets structured decoding, which measures
+# a parser mismatch rather than context engineering.  Empty guideline ids are permitted in
+# the baseline; the ``schema`` layer is what requires them to be meaningful source bindings.
+COMMON_OUTPUT_CONTRACT = (
+    "Return exactly one JSON object and no Markdown. It must have arrays named "
+    "danger_signs, medications, and lifestyle. Each danger sign/lifestyle item must contain "
+    "text and guideline_id; each medication item must contain drug, instruction, and "
+    "guideline_id. Use an empty string for guideline_id when no source is cited. "
+    "Use [] for a section with no applicable items."
+)
+
 BASELINE_SYSTEM = (
     "You are a helpful assistant. Write clear discharge instructions for the patient, "
-    "covering danger signs to watch for, their medications, and lifestyle advice."
+    "covering danger signs to watch for, their medications, and lifestyle advice. "
+    "Do not claim certainty about facts that are not in the supplied reference material."
 )
 
 ENGINEERED_SYSTEM = (
     "You are a clinical aftercare assistant. You may ONLY state facts present in the provided "
     "CONTEXT passages. Every claim MUST cite its guideline_id. Return JSON matching the schema "
     "and nothing else. `danger_signs` must include EVERY danger-sign passage present in the "
-    "context and must never be empty. Do NOT add any medication that is not in the patient's "
-    "listed medications. If a fact is not in the context, omit it. This is assistive and defers "
-    "to the care team."
+    "context and must never be empty. `lifestyle` must include EVERY lifestyle passage present "
+    "in the context. Include every medication passage that matches the patient's listed "
+    "medications, preserving any timing or caution in that passage. Do NOT add any medication "
+    "that is not in the patient's listed medications. If a fact is not in the context, omit it. "
+    "This is assistive and defers to the care team."
 )
 
 
 def build_system(cfg):
-    return ENGINEERED_SYSTEM if (cfg.schema or cfg.retrieval or cfg.reground) else BASELINE_SYSTEM
+    # Retrieval/compression should change only the supplied context.  Turning on retrieval must
+    # not silently add a stronger grounding instruction, otherwise its ablation is confounded.
+    # The schema layer owns citation binding + source-only generation constraints.
+    base = ENGINEERED_SYSTEM if (cfg.schema or cfg.reground) else BASELINE_SYSTEM
+    return base + "\n\nOUTPUT CONTRACT: " + COMMON_OUTPUT_CONTRACT
 
 
-def _order_for_robustness(pairs, enabled):
+def order_context_pairs(pairs, enabled):
     """Layer 6: place safety-critical (danger-sign) passages at the edges, not buried."""
     if not enabled:
         return pairs
@@ -83,21 +106,27 @@ def _order_for_robustness(pairs, enabled):
 
 
 def build_context_block(compressed_pairs, cfg):
-    pairs = _order_for_robustness(compressed_pairs, cfg.ordering)
+    pairs = order_context_pairs(compressed_pairs, cfg.ordering)
     lines = []
     for p, text in pairs:
-        lines.append(f"[{p['id']}] ({p['type']}) {text}")
+        lines.append(render_context_passage(p, text))
     return "\n".join(lines)
 
 
+def render_context_passage(passage, text):
+    """The exact serialized representation that is counted and shown to the model."""
+    return f"[{passage['id']}] ({passage['type']}) {text}"
+
+
 def build_fewshot_block(example):
-    """Layer 4: one nearest gold example rendered as an input->output demo."""
+    """Layer 4: one *held-out training* example rendered as an input->output demo."""
     if not example:
         return ""
     import json
 
     return (
-        "EXAMPLE (format to imitate exactly):\n"
+        f"EXAMPLE {example.get('id', 'TRAINING-EXAMPLE')} (held-out training memory; "
+        "format to imitate, not patient facts to copy):\n"
         f"PATIENT: {example['profile']} MEDS: {', '.join(example['meds'])}\n"
         f"OUTPUT: {json.dumps(example['output'])}\n\n"
     )
@@ -107,19 +136,20 @@ def build_user(case, context_block, fewshot_block, cfg):
     parts = []
     if fewshot_block:
         parts.append(fewshot_block)
-    if cfg.retrieval or cfg.compression or cfg.schema:
-        parts.append("CONTEXT passages:\n" + context_block + "\n")
-    else:
-        # baseline: raw dump, no citation instruction
-        parts.append("Reference material:\n" + context_block + "\n")
+    # Keep the framing stable across arms. The baseline receives the raw corpus; engineered
+    # arms receive selected/compressed/ordered passages. The label itself is not a treatment.
+    parts.append("CONTEXT passages:\n" + context_block + "\n")
     parts.append(f"PATIENT: {case['profile']}\nMEDICATIONS: {', '.join(case['meds'])}\n")
     if cfg.schema:
         parts.append(
-            "Produce the aftercare plan as JSON with keys danger_signs, medications, lifestyle. "
-            "Every item needs a guideline_id from the CONTEXT."
+            "Produce the aftercare plan using the OUTPUT CONTRACT. Every item needs a non-empty "
+            "guideline_id from the CONTEXT, and the cited passage must support the item."
         )
     else:
-        parts.append("Write the aftercare plan.")
+        parts.append(
+            "Produce the aftercare plan using the OUTPUT CONTRACT. Citations are optional in this "
+            "baseline arm; leave guideline_id empty rather than guessing a source."
+        )
     return "\n".join(parts)
 
 

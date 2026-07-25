@@ -3,7 +3,7 @@
 Sweeps the context-token budget and plots accuracy (danger recall & citation faithfulness)
 vs the average context tokens actually spent, for two pipelines:
 
-  - engineered  = FULL config, token budget swept (retrieval + compression + ordering)
+  - engineered  = CE_FULL config, token budget swept (retrieval + compression + ordering)
   - naive RAG   = baseline config (raw dump), same budget sweep (just truncates the dump)
 
 The money finding: the engineered pipeline reaches near-max accuracy far to the LEFT (cheap)
@@ -29,7 +29,9 @@ from src.prompts import PLAN_SCHEMA
 from src.retrieval import GuidelineCorpus
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUDGETS = [150, 250, 400, 600, 900, None]  # None = no cap (dump-all for naive)
+# 250 is the smallest current estimated budget that can fit the explicit safety-pinned block.
+# Lower budgets fail loudly rather than silently exceeding a claimed hard cap.
+BUDGETS = [250, 300, 400, 600, 900, None]  # None = no cap (dump-all for naive)
 
 
 def _point(cfg, cases, corpus, client):
@@ -65,7 +67,9 @@ def main():
     cases = load_cases(args.cases)
     client = make_client(args.mock, base_url=args.base_url, model=args.model, schema=PLAN_SCHEMA)
 
-    eng_x, eng_r, eng_f = sweep(pipeline.FULL, cases, corpus, client)
+    # Do not use optional re-grounding here: it can add a second model generation, so comparing
+    # it as if it had one-pass cost would be misleading. The frontier is CE_FULL only.
+    eng_x, eng_r, eng_f = sweep(pipeline.CE_FULL, cases, corpus, client)
     naive_x, naive_r, naive_f = sweep(pipeline.BASELINE, cases, corpus, client)
 
     print("\nEFFICIENCY FRONTIER (accuracy vs avg context tokens)\n")

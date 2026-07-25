@@ -1,55 +1,63 @@
 # GroundedRx — pitch outline (2 min, 4 slides)
 
-**One-liner:** Context engineering — not parameters — makes a small language model produce safe,
-fully-grounded patient aftercare. We treat the context window as a scarce resource and prove,
-with an ablation, that every layer earns its place.
+**One-liner:** GroundedRx treats context as a product surface: it assembles a patient-selected
+synthetic chart, source passages, citation constraints, and dynamic memory so a Gemma model can
+produce an inspectable aftercare draft.
 
----
+## Slide 1 — The problem
 
-### Slide 1 — Thesis
-> A small model + engineered context ≥ a bigger model prompted naively — and it's private,
-> offline, and every claim is cited.
-- Domain: heart-failure discharge / medication instructions (illustrative, synthetic guidelines).
-- Safety framing: assistive, human-in-the-loop, defers to the care team.
+> Small models fail less because we add clever wording and more because we give them the right
+> information, in the right form, at the right time.
 
-### Slide 2 — The failure (why it's hard)
-- A naively-prompted model, given a bloated raw context (14 real passages + **60 distractors**):
-  - **misses danger-signs** (lost in the middle),
-  - **invents medications** (copies distractor drugs / hallucinates),
-  - **cites nothing**.
-- Show a real bad baseline output.
+- Domain: illustrative heart-failure aftercare with a synthetic benchmark.
+- Raw context is distractor-heavy; a patient needs clear, sourced next steps.
+- GroundedRx is assistive and human-in-the-loop — not a medical device or clinical validation.
 
-### Slide 3 — The evidence (the win) — from `eval/run_eval.py`
-Context engineering ALONE (no post-hoc filter) on the 30-case harness:
+## Slide 2 — The context system
 
-| | danger recall | hallucination | citation faithfulness | ctx tokens |
-|---|---|---|---|---|
-| baseline (naive dump) | 50% | 100% | 0% | 2685 |
-| **context-engineered** | **100%** | **10%** | **~100%** | **615 (−77%)** |
+Show the live workspace:
 
-- **Leave-one-out**: `retrieval` is the dominant lever (removing it: recall→50%, halluc→100%,
-  tokens→1675). Schema owns citations; few-shot owns invention-suppression.
-- **Efficiency frontier**: near-max accuracy at a fraction of naive RAG's tokens.
-- **Lost-in-the-middle**: naive sags to ~8% mid-context; engineered ordering stays flat.
-- The optional multi-step re-grounding closes the last 10%→0% — reported separately; **the win
-  is context management, not a filter** (see `CONTEXT_ENGINEERING.md`).
+1. Select one of three clearly labelled synthetic records.
+2. Open the discharge summary, medication reconciliation, and follow-up note.
+3. Press **Generate grounded aftercare plan**.
+4. Show the exact context ingredients: patient record, current medicines, explicit safety and
+   self-care policy, guideline selection, compression, citation schema, held-out exemplar, and
+   edge ordering.
+5. Show the cited plan and the exact guideline passages the model received.
 
-### Slide 4 — Live demo + responsibility
-- Dynamic dashboard: pick a patient → grounded aftercare plan, every line cited; context graph
-  shows retrieved chunks vs pruned distractors; grounded copilot.
-- Runs offline (privacy-preserving) and **live on the real open Gemma 4** model.
-- Honest, sourced, human-in-the-loop; illustrative synthetic data.
+Emphasize: the deterministic source lookup is labelled as lookup-only; the Generate action is
+the actual model call. A provider error remains visible rather than falling back to a mock plan.
 
----
+## Slide 3 — The evidence
 
-## Model note (be transparent)
-- Intended SLM = **Gemma 4 E4B** (~4B). It is **not available on Google AI Studio's API**
-  (only `gemma-4-26b-a4b-it` — a MoE with ~3.8B **active** params — and `gemma-4-31b-it`).
-- Live demo therefore runs on **`gemma-4-26b-a4b-it`** (efficient MoE, ~3.8B active) as the SLM
-  proxy; the dense **31B** is the naive big baseline. The context-engineering thesis is
-  model-agnostic — the ablation is the proof.
-- The evaluation **harness numbers** above are reproducible offline (`--mock`) and via the real
-  model with the CLI (`run_eval.py --base-url … --model … --api-key …`); the app's evidence
-  panel uses the harness so it stays instant and offline during the pitch.
+Open the Evidence tab and show the saved provenance artifact, not a hand-made chart.
 
-> Every number on a slide must be reproducible by our own code.
+- Exact Gemma model ID, endpoint, date, sample size, code revision, corpus/case hashes.
+- Same synthetic cases across the baseline, additive layers, and leave-one-out configurations.
+- Raw response, parsed JSON, shown passages, citations, and provider-reported token usage are
+  all stored in `eval/runs/`.
+- Read the recorded values from the page; do **not** substitute mock percentages.
+- Explain that danger signs and foundational self-care are transparent policy-pinned context,
+  not a BM25-retrieval claim.
+
+Suggested sentence:
+
+> “The claim here is reproducible grounding on a synthetic benchmark. You can inspect every
+> piece of context the model saw and reproduce this run from the artifact.”
+
+## Slide 4 — Responsibility and next step
+
+- Every identity, file, guideline, and evaluation case is synthetic.
+- Cloud mode sends the selected context to the configured provider; only a verified local
+  deployment can be described as offline.
+- Automated source checks are not clinician validation.
+- Next: clinician-reviewed cases, approved deployment, and a real same-case comparison against
+  `google/gemma-4-31b-it` before making a size-based claim.
+
+## Model note
+
+- Live demo model: `google/gemma-4-26b-a4b-it`, a mixture-of-experts model with roughly 3.8B
+  active parameters per token.
+- Do not call it a dense “4B” model.
+- Do not say “small beats big” until both models have recorded real outputs for the same selected
+  case set.

@@ -1,57 +1,102 @@
 # GroundedRx
 
-**Context engineering, not parameters, makes a 4B SLM safe.**
+GroundedRx is a synthetic, reproducible context-engineering prototype for cited heart-failure
+aftercare drafts. It tests whether a carefully managed context helps an efficient Gemma model
+produce more complete, source-linked output than the same model given a raw, distractor-heavy
+context.
 
-GroundedRx is a context-engineering pipeline that turns a small **Gemma 4 E4B** model into
-one that produces safe, fully-grounded patient discharge / medication instructions — every
-claim cited, danger-signs never omitted, hallucinations driven to ~0 — while treating the
-context window as a scarce resource and *proving with numbers* that the context engineering
-is what did it.
+It is not a clinical product, clinical validation, or a source of real patient data.
 
-> ⚠️ **Illustrative / synthetic guideline content. Not clinical advice.** Assistive,
-> human-in-the-loop; defers to the care team. Privacy-preserving (runs offline on a 4B model).
+## What is real vs. illustrative
 
-## The evidence that wins (Phases 5–6)
+- The patient identities, chart files, guidelines, and evaluation cases are synthetic.
+- `MockClient` is a deterministic UI/test fixture only. Its numbers are explicitly illustrative
+  and must never be presented as Gemma results.
+- A real run uses the selected OpenAI-compatible provider, records the model response, prompts,
+  shown context, provider usage, configuration, dataset hashes, and metrics in `eval/runs/`.
+- The Evidence page and static export read only recorded **real-model** artifacts. If no artifact
+  exists, they deliberately show no benchmark chart.
 
-1. **Additive ablation** — turn layers on one at a time; safety metrics climb.
-2. **Leave-one-out ablation** — remove each layer from the full stack; show its marginal value.
-3. **Efficiency frontier** — accuracy vs context-token budget (the signature artifact).
-4. **Small-beats-big** — engineered E4B ≥ naively-prompted Gemma 4 12B.
-5. **Lost-in-the-middle** — engineered context stays robust to fact position.
+## Context-engineering stack
 
-## Environment
+1. Patient-specific guideline selection, with explicit safety and foundational self-care policy
+   passages tracked separately from BM25 retrieval.
+2. Extractive compression that retains medication timing and cautions.
+3. Citation-bound structured output.
+4. A dynamically selected, held-out training exemplar.
+5. Edge ordering for position robustness.
+6. Optional, separately reported re-grounding pass.
 
-- Apple M5, 24 GB, macOS (arm64). **No CUDA → Ollama serving only** (vLLM not applicable).
-- Python **3.12** (Homebrew). Build a venv with it.
-- Models: `gemma4:e4b` (SLM under test), `gemma4:12b` (big baseline).
+The real evaluation uses the same parseable JSON envelope in every arm. Metrics check claims
+against only the passages shown to the model; they are automated synthetic-benchmark checks, not
+clinical safety claims.
 
-## See the platform (no server)
-
-Open **`GroundedRx.html`** directly in any browser (double-click). It is fully self-contained —
-all 30 patients, grounded plans, context graphs, a client-side grounded copilot, and the
-evidence artifacts (ablation table + charts) are baked in; nothing is fetched, so it works
-offline / in airplane mode. Regenerate it from the pipeline any time:
-
-```bash
-python app/build_static.py     # -> GroundedRx.html
-```
-
-For the live, model-backed app: `streamlit run app/streamlit_app.py`.
-
-## Quickstart
+## Run the app
 
 ```bash
-python3.12 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv
+. .venv/bin/activate
 pip install -r requirements.txt
-
-# The harness runs WITHOUT a model via a stub that misbehaves un-engineered and behaves engineered:
-python eval/run_eval.py --mock
-
-# Real model (after: brew install ollama; ollama serve; ollama pull gemma4:e4b):
-python eval/run_eval.py --base-url http://localhost:11434/v1 --model gemma4:e4b
+streamlit run app/streamlit_app.py
 ```
 
-## Layout
-See `GroundedRx_BUILD_PLAN.md` Section 3. Every context-engineering layer is a toggle so the
-ablation can isolate it: retrieval, compression, locked schema, dynamic few-shot, verification,
-ordering/budgeting.
+The workspace shows three synthetic patient records. Open the selected files, then press
+**Generate grounded aftercare plan**. The action builds context from that record and the
+guideline pipeline; it displays the chosen model, latency, usage, and cited passages. A failed
+cloud call remains an error — it is never replaced with a mock answer.
+
+The default cloud configuration is OpenRouter-compatible:
+
+```text
+base URL: https://openrouter.ai/api/v1
+model:    google/gemma-4-26b-a4b-it
+```
+
+Set a credential locally in an ignored `.env` file, for example as `GROUNDEDRX_API_KEY`. Cloud
+mode sends the selected synthetic context to that provider. Never send real patient information
+to an unapproved endpoint.
+
+## Produce real evidence
+
+Run a bounded pilot first. The command below selects six varied synthetic profiles and medication
+sets, writes a provenance artifact, and labels the sample size in the output:
+
+```bash
+.venv/bin/python eval/run_eval.py \
+  --base-url https://openrouter.ai/api/v1 \
+  --model google/gemma-4-26b-a4b-it \
+  --case-ids HF-01,HF-07,HF-13,HF-19,HF-25,HF-26
+```
+
+For a full 30-case experiment, omit `--case-ids`. Review the real artifact before making a
+claim; it includes the raw model outputs and should stay out of source control (`eval/runs/` is
+ignored).
+
+To exercise the UI and evaluator without a model, run:
+
+```bash
+.venv/bin/python eval/run_eval.py --mock
+```
+
+That is a fixture check, not evidence about Gemma.
+
+## Export a static snapshot
+
+The standalone page is intentionally generated only from a recorded real artifact:
+
+```bash
+.venv/bin/python app/build_static.py --artifact eval/runs/<real-ablation>.json
+```
+
+The resulting `GroundedRx.html` is a read-only evidence snapshot: it has no live model call,
+contains three synthetic demo records, and includes model/run provenance. It omits unrecorded
+frontier and lost-in-the-middle charts rather than presenting mock figures.
+
+## Model framing
+
+`google/gemma-4-26b-a4b-it` is a mixture-of-experts model with roughly 3.8B active parameters
+per token, not a dense 4B model. A dense `google/gemma-4-31b-it` comparison is meaningful only
+after both models have recorded real artifacts; GroundedRx does not claim that a smaller model
+beats it until those results exist.
+
+See [CONTEXT_ENGINEERING.md](CONTEXT_ENGINEERING.md) for the methodology and caveats.

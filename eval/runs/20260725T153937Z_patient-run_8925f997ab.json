@@ -1,0 +1,466 @@
+{
+  "additive": [
+    {
+      "aggregate": {
+        "avg_context_tokens_estimate": 401.0,
+        "avg_ctx_tokens": 401.0,
+        "avg_generation_count": 1.0,
+        "avg_prompt_tokens_estimate": 978.0,
+        "avg_provider_completion_tokens": 460.0,
+        "avg_provider_prompt_tokens": 1006.0,
+        "avg_provider_total_tokens": 1466.0,
+        "case_scores": [
+          {
+            "case_id": "HF-01",
+            "citation_coverage": 1.0,
+            "citation_faithfulness": 1.0,
+            "danger_recall": 1.0,
+            "has_hallucination": false,
+            "unsupported_claim_rate": 0.0,
+            "unsupported_claims": []
+          }
+        ],
+        "citation_coverage": 1.0,
+        "citation_faithfulness": 1.0,
+        "danger_recall": 1.0,
+        "hallucination_rate": 0.0,
+        "unsupported_claim_rate": 0.0
+      },
+      "cases": [
+        {
+          "case_id": "HF-01",
+          "case_input": {
+            "allowed_med_drugs": [
+              "furosemide",
+              "lisinopril"
+            ],
+            "forbidden_terms": [
+              "ibuprofen",
+              "digoxin",
+              "warfarin"
+            ],
+            "id": "HF-01",
+            "meds": [
+              "furosemide",
+              "lisinopril"
+            ],
+            "presentation_profile": "72-year-old, new HFrEF, lives alone.",
+            "profile": "72-year-old, new HFrEF, lives alone.\n\nPATIENT-SELECTED CHART CONTEXT (synthetic demo only; not clinical data):\n[Discharge summary · synthetic demo file]\nAdmission: 17 Jul 2026. Discharge: 21 Jul 2026. Primary context: 72-year-old, new HFrEF, lives alone.\n[Medication reconciliation · synthetic demo file]\nfurosemide, lisinopril\n[Follow-up note · synthetic demo file]\nUse the grounded aftercare workflow to explain only cited guidance and defer decisions to the care team.",
+            "required_danger_ids": [
+              "HF-DS-01",
+              "HF-DS-02",
+              "HF-DS-03",
+              "HF-DS-04",
+              "HF-DS-05",
+              "HF-DS-06"
+            ],
+            "selected_chart_files": [
+              {
+                "content": "Admission: 17 Jul 2026. Discharge: 21 Jul 2026. Primary context: 72-year-old, new HFrEF, lives alone.",
+                "detail": "Synthetic summary of admission, diagnosis, and planned follow-up.",
+                "name": "hf-01_discharge_summary.pdf",
+                "type": "Discharge summary"
+              },
+              {
+                "content": "furosemide, lisinopril",
+                "detail": "Current medicines supplied to the context-engineering pipeline.",
+                "name": "hf-01_medications.csv",
+                "type": "Medication reconciliation"
+              },
+              {
+                "content": "Use the grounded aftercare workflow to explain only cited guidance and defer decisions to the care team.",
+                "detail": "Synthetic care-team note for the demo; no real patient information.",
+                "name": "hf-01_care_team_note.txt",
+                "type": "Follow-up note"
+              }
+            ]
+          },
+          "config": {
+            "compression": true,
+            "fewshot": true,
+            "ordering": true,
+            "reground": false,
+            "retrieval": true,
+            "schema": true,
+            "token_budget": null,
+            "top_k": 8
+          },
+          "context": {
+            "selection": {
+              "medication_pinned_ids": [
+                "HF-MED-furosemide",
+                "HF-MED-lisinopril"
+              ],
+              "mode": "bm25_plus_explicit_safety_policy",
+              "note": "Danger-sign and foundational self-care passages are policy-pinned for patient safety/understandability and must not be interpreted as retrieval discovery.",
+              "retrieved_ids": [
+                "HF-LIFE-03",
+                "HF-MED-furosemide",
+                "HF-MED-lisinopril",
+                "HF-LIFE-01",
+                "HF-DS-02"
+              ],
+              "safety_pinned_ids": [
+                "HF-DS-01",
+                "HF-DS-02",
+                "HF-DS-03",
+                "HF-DS-04",
+                "HF-DS-05",
+                "HF-DS-06"
+              ],
+              "self_care_policy_ids": [
+                "HF-LIFE-01",
+                "HF-LIFE-02",
+                "HF-LIFE-03"
+              ],
+              "shown_ids": [
+                "HF-MED-furosemide",
+                "HF-MED-lisinopril",
+                "HF-LIFE-03",
+                "HF-LIFE-01",
+                "HF-DS-02",
+                "HF-DS-01",
+                "HF-DS-03",
+                "HF-DS-04",
+                "HF-DS-05",
+                "HF-DS-06",
+                "HF-LIFE-02"
+              ],
+              "top_k": 8
+            },
+            "shown_passages": [
+              {
+                "concept": "worsening breathlessness",
+                "id": "HF-DS-02",
+                "text": "New or worsening shortness of breath at rest, or waking at night gasping for air, is a heart-failure danger sign requiring urgent care.",
+                "type": "danger_sign"
+              },
+              {
+                "concept": "rapid weight gain",
+                "id": "HF-DS-01",
+                "text": "Weight gain of more than 2 kg (about 4-5 lb) in 2 to 3 days can signal fluid buildup in heart failure and needs urgent clinician contact.",
+                "type": "danger_sign"
+              },
+              {
+                "concept": "swelling edema",
+                "id": "HF-DS-03",
+                "text": "Increasing swelling of the ankles, legs, or abdomen indicates worsening fluid retention and should be reported promptly.",
+                "type": "danger_sign"
+              },
+              {
+                "drug": "furosemide",
+                "id": "HF-MED-furosemide",
+                "text": "Furosemide is a loop diuretic used to remove excess fluid in heart failure. Take it in the morning to avoid nighttime urination; report muscle cramps or excessive thirst.",
+                "type": "medication"
+              },
+              {
+                "drug": "lisinopril",
+                "id": "HF-MED-lisinopril",
+                "text": "Lisinopril is an ACE inhibitor that lowers blood pressure and reduces strain on the heart. A dry cough or dizziness can occur; do not stop without advice.",
+                "type": "medication"
+              },
+              {
+                "concept": "fluid awareness",
+                "id": "HF-LIFE-03",
+                "text": "Follow any fluid-intake limit set by your care team.",
+                "type": "lifestyle"
+              },
+              {
+                "concept": "sodium restriction",
+                "id": "HF-LIFE-01",
+                "text": "Limiting dietary sodium (salt) helps prevent fluid buildup.",
+                "type": "lifestyle"
+              },
+              {
+                "concept": "daily weights",
+                "id": "HF-LIFE-02",
+                "text": "Weigh yourself each morning after using the bathroom and before breakfast.",
+                "type": "lifestyle"
+              },
+              {
+                "concept": "chest pain",
+                "id": "HF-DS-04",
+                "text": "Chest pain or pressure, especially with sweating or nausea, may indicate a cardiac emergency; call emergency services immediately.",
+                "type": "danger_sign"
+              },
+              {
+                "concept": "lightheadedness fainting",
+                "id": "HF-DS-05",
+                "text": "Severe dizziness, lightheadedness, or fainting can reflect dangerously low blood pressure or an abnormal heart rhythm and needs urgent evaluation.",
+                "type": "danger_sign"
+              },
+              {
+                "concept": "confusion",
+                "id": "HF-DS-06",
+                "text": "New confusion, marked fatigue, or reduced alertness can be a sign of poor heart output and warrants urgent medical attention.",
+                "type": "danger_sign"
+              }
+            ]
+          },
+          "fewshot": {
+            "example_id": "TRAIN-HF-01",
+            "split": "train"
+          },
+          "metrics": {
+            "case_id": "HF-01",
+            "citation_coverage": 1.0,
+            "citation_faithfulness": 1.0,
+            "danger_recall": 1.0,
+            "has_hallucination": false,
+            "unsupported_claim_rate": 0.0,
+            "unsupported_claims": []
+          },
+          "parsed_plan": {
+            "danger_signs": [
+              {
+                "guideline_id": "HF-DS-02",
+                "text": "New or worsening shortness of breath at rest, or waking at night gasping for air, is a heart-failure danger sign requiring urgent care."
+              },
+              {
+                "guideline_id": "HF-DS-01",
+                "text": "Weight gain of more than 2 kg (about 4-5 lb) in 2 to 3 days can signal fluid buildup in heart failure and needs urgent clinician contact."
+              },
+              {
+                "guideline_id": "HF-DS-03",
+                "text": "Increasing swelling of the ankles, legs, or abdomen indicates worsening fluid retention and should be reported promptly."
+              },
+              {
+                "guideline_id": "HF-DS-04",
+                "text": "Chest pain or pressure, especially with sweating or nausea, may indicate a cardiac emergency; call emergency services immediately."
+              },
+              {
+                "guideline_id": "HF-DS-05",
+                "text": "Severe dizziness, lightheadedness, or fainting can reflect dangerously low blood pressure or an abnormal heart rhythm and needs urgent evaluation."
+              },
+              {
+                "guideline_id": "HF-DS-06",
+                "text": "New confusion, marked fatigue, or reduced alertness can be a sign of poor heart output and warrants urgent medical attention."
+              }
+            ],
+            "lifestyle": [
+              {
+                "guideline_id": "HF-LIFE-03",
+                "text": "Follow any fluid-intake limit set by your care team."
+              },
+              {
+                "guideline_id": "HF-LIFE-01",
+                "text": "Limiting dietary sodium (salt) helps prevent fluid buildup."
+              },
+              {
+                "guideline_id": "HF-LIFE-02",
+                "text": "Weigh yourself each morning after using the bathroom and before breakfast."
+              }
+            ],
+            "medications": [
+              {
+                "drug": "furosemide",
+                "guideline_id": "HF-MED-furosemide",
+                "instruction": "Take it in the morning to avoid nighttime urination; report muscle cramps or excessive thirst."
+              },
+              {
+                "drug": "lisinopril",
+                "guideline_id": "HF-MED-lisinopril",
+                "instruction": "A dry cough or dizziness can occur; do not stop without advice."
+              }
+            ]
+          },
+          "prompts": {
+            "system": "You are a clinical aftercare assistant. You may ONLY state facts present in the provided CONTEXT passages. Every claim MUST cite its guideline_id. Return JSON matching the schema and nothing else. `danger_signs` must include EVERY danger-sign passage present in the context and must never be empty. `lifestyle` must include EVERY lifestyle passage present in the context. Include every medication passage that matches the patient's listed medications, preserving any timing or caution in that passage. Do NOT add any medication that is not in the patient's listed medications. If a fact is not in the context, omit it. This is assistive and defers to the care team.\n\nOUTPUT CONTRACT: Return exactly one JSON object and no Markdown. It must have arrays named danger_signs, medications, and lifestyle. Each danger sign/lifestyle item must contain text and guideline_id; each medication item must contain drug, instruction, and guideline_id. Use an empty string for guideline_id when no source is cited. Use [] for a section with no applicable items.",
+            "user": "EXAMPLE TRAIN-HF-01 (held-out training memory; format to imitate, not patient facts to copy):\nPATIENT: 68-year-old with chronic heart failure and recent fluid retention. MEDS: furosemide, lisinopril\nOUTPUT: {\"danger_signs\": [{\"text\": \"Rapid weight gain over 2 to 3 days needs urgent clinician contact.\", \"guideline_id\": \"HF-DS-01\"}], \"medications\": [{\"drug\": \"furosemide\", \"instruction\": \"Take it in the morning.\", \"guideline_id\": \"HF-MED-furosemide\"}], \"lifestyle\": [{\"text\": \"Limit dietary sodium as advised by the care team.\", \"guideline_id\": \"HF-LIFE-01\"}]}\n\n\nCONTEXT passages:\n[HF-DS-02] (danger_sign) New or worsening shortness of breath at rest, or waking at night gasping for air, is a heart-failure danger sign requiring urgent care.\n[HF-DS-01] (danger_sign) Weight gain of more than 2 kg (about 4-5 lb) in 2 to 3 days can signal fluid buildup in heart failure and needs urgent clinician contact.\n[HF-DS-03] (danger_sign) Increasing swelling of the ankles, legs, or abdomen indicates worsening fluid retention and should be reported promptly.\n[HF-MED-furosemide] (medication) Furosemide is a loop diuretic used to remove excess fluid in heart failure. Take it in the morning to avoid nighttime urination; report muscle cramps or excessive thirst.\n[HF-MED-lisinopril] (medication) Lisinopril is an ACE inhibitor that lowers blood pressure and reduces strain on the heart. A dry cough or dizziness can occur; do not stop without advice.\n[HF-LIFE-03] (lifestyle) Follow any fluid-intake limit set by your care team.\n[HF-LIFE-01] (lifestyle) Limiting dietary sodium (salt) helps prevent fluid buildup.\n[HF-LIFE-02] (lifestyle) Weigh yourself each morning after using the bathroom and before breakfast.\n[HF-DS-04] (danger_sign) Chest pain or pressure, especially with sweating or nausea, may indicate a cardiac emergency; call emergency services immediately.\n[HF-DS-05] (danger_sign) Severe dizziness, lightheadedness, or fainting can reflect dangerously low blood pressure or an abnormal heart rhythm and needs urgent evaluation.\n[HF-DS-06] (danger_sign) New confusion, marked fatigue, or reduced alertness can be a sign of poor heart output and warrants urgent medical attention.\n\nPATIENT: 72-year-old, new HFrEF, lives alone.\n\nPATIENT-SELECTED CHART CONTEXT (synthetic demo only; not clinical data):\n[Discharge summary · synthetic demo file]\nAdmission: 17 Jul 2026. Discharge: 21 Jul 2026. Primary context: 72-year-old, new HFrEF, lives alone.\n[Medication reconciliation · synthetic demo file]\nfurosemide, lisinopril\n[Follow-up note · synthetic demo file]\nUse the grounded aftercare workflow to explain only cited guidance and defer decisions to the care team.\nMEDICATIONS: furosemide, lisinopril\n\nProduce the aftercare plan using the OUTPUT CONTRACT. Every item needs a non-empty guideline_id from the CONTEXT, and the cited passage must support the item."
+          },
+          "raw_generations": [
+            {
+              "attempt": 1,
+              "created": 1784993961,
+              "http_status": 200,
+              "latency_ms": 16563.38,
+              "model": "google/gemma-4-26b-a4b-it",
+              "parse_status": "valid_json",
+              "parsed_plan": {
+                "danger_signs": [
+                  {
+                    "guideline_id": "HF-DS-02",
+                    "text": "New or worsening shortness of breath at rest, or waking at night gasping for air, is a heart-failure danger sign requiring urgent care."
+                  },
+                  {
+                    "guideline_id": "HF-DS-01",
+                    "text": "Weight gain of more than 2 kg (about 4-5 lb) in 2 to 3 days can signal fluid buildup in heart failure and needs urgent clinician contact."
+                  },
+                  {
+                    "guideline_id": "HF-DS-03",
+                    "text": "Increasing swelling of the ankles, legs, or abdomen indicates worsening fluid retention and should be reported promptly."
+                  },
+                  {
+                    "guideline_id": "HF-DS-04",
+                    "text": "Chest pain or pressure, especially with sweating or nausea, may indicate a cardiac emergency; call emergency services immediately."
+                  },
+                  {
+                    "guideline_id": "HF-DS-05",
+                    "text": "Severe dizziness, lightheadedness, or fainting can reflect dangerously low blood pressure or an abnormal heart rhythm and needs urgent evaluation."
+                  },
+                  {
+                    "guideline_id": "HF-DS-06",
+                    "text": "New confusion, marked fatigue, or reduced alertness can be a sign of poor heart output and warrants urgent medical attention."
+                  }
+                ],
+                "lifestyle": [
+                  {
+                    "guideline_id": "HF-LIFE-03",
+                    "text": "Follow any fluid-intake limit set by your care team."
+                  },
+                  {
+                    "guideline_id": "HF-LIFE-01",
+                    "text": "Limiting dietary sodium (salt) helps prevent fluid buildup."
+                  },
+                  {
+                    "guideline_id": "HF-LIFE-02",
+                    "text": "Weigh yourself each morning after using the bathroom and before breakfast."
+                  }
+                ],
+                "medications": [
+                  {
+                    "drug": "furosemide",
+                    "guideline_id": "HF-MED-furosemide",
+                    "instruction": "Take it in the morning to avoid nighttime urination; report muscle cramps or excessive thirst."
+                  },
+                  {
+                    "drug": "lisinopril",
+                    "guideline_id": "HF-MED-lisinopril",
+                    "instruction": "A dry cough or dizziness can occur; do not stop without advice."
+                  }
+                ]
+              },
+              "provider": "openai-compatible",
+              "raw_response": "{\"danger_signs\": [{\"text\": \"New or worsening shortness of breath at rest, or waking at night gasping for air, is a heart-failure danger sign requiring urgent care.\", \"guideline_id\": \"HF-DS-02\"}, {\"text\": \"Weight gain of more than 2 kg (about 4-5 lb) in 2 to 3 days can signal fluid buildup in heart failure and needs urgent clinician contact.\", \"guideline_id\": \"HF-DS-01\"}, {\"text\": \"Increasing swelling of the ankles, legs, or abdomen indicates worsening fluid retention and should be reported promptly.\", \"guideline_id\": \"HF-DS-03\"}, {\"text\": \"Chest pain or pressure, especially with sweating or nausea, may indicate a cardiac emergency; call emergency services immediately.\", \"guideline_id\": \"HF-DS-04\"}, {\"text\": \"Severe dizziness, lightheadedness, or fainting can reflect dangerously low blood pressure or an abnormal heart rhythm and needs urgent evaluation.\", \"guideline_id\": \"HF-DS-05\"}, {\"text\": \"New confusion, marked fatigue, or reduced alertness can be a sign of poor heart output and warrants urgent medical attention.\", \"guideline_id\": \"HF-DS-06\"}], \"medications\": [{\"drug\": \"furosemide\", \"instruction\": \"Take it in the morning to avoid nighttime urination; report muscle cramps or excessive thirst.\", \"guideline_id\": \"HF-MED-furosemide\"}, {\"drug\": \"lisinopril\", \"instruction\": \"A dry cough or dizziness can occur; do not stop without advice.\", \"guideline_id\": \"HF-MED-lisinopril\"}], \"lifestyle\": [{\"text\": \"Follow any fluid-intake limit set by your care team.\", \"guideline_id\": \"HF-LIFE-03\"}, {\"text\": \"Limiting dietary sodium (salt) helps prevent fluid buildup.\", \"guideline_id\": \"HF-LIFE-01\"}, {\"text\": \"Weigh yourself each morning after using the bathroom and before breakfast.\", \"guideline_id\": \"HF-LIFE-02\"}]}",
+              "response_id": "gen-1784993961-CXagmFzQskJU6f35343b",
+              "response_model": "google/gemma-4-26b-a4b-it",
+              "strict": false,
+              "structured_output_enforced": true,
+              "structured_output_requested": true,
+              "usage": {
+                "completion_tokens": 460,
+                "cost": 0,
+                "is_byok": 0,
+                "prompt_tokens": 1006,
+                "total_tokens": 1466
+              }
+            }
+          ],
+          "telemetry": {
+            "context_tokens_estimate": 401,
+            "fewshot_example_id": "TRAIN-HF-01",
+            "fewshot_split": "train",
+            "generation_count": 1,
+            "generation_latency_ms": 16563.38,
+            "prompt_tokens_estimate": 978,
+            "provider_usage": {
+              "completion_tokens": 460,
+              "prompt_tokens": 1006,
+              "total_tokens": 1466
+            },
+            "selection": {
+              "medication_pinned_ids": [
+                "HF-MED-furosemide",
+                "HF-MED-lisinopril"
+              ],
+              "mode": "bm25_plus_explicit_safety_policy",
+              "note": "Danger-sign and foundational self-care passages are policy-pinned for patient safety/understandability and must not be interpreted as retrieval discovery.",
+              "retrieved_ids": [
+                "HF-LIFE-03",
+                "HF-MED-furosemide",
+                "HF-MED-lisinopril",
+                "HF-LIFE-01",
+                "HF-DS-02"
+              ],
+              "safety_pinned_ids": [
+                "HF-DS-01",
+                "HF-DS-02",
+                "HF-DS-03",
+                "HF-DS-04",
+                "HF-DS-05",
+                "HF-DS-06"
+              ],
+              "self_care_policy_ids": [
+                "HF-LIFE-01",
+                "HF-LIFE-02",
+                "HF-LIFE-03"
+              ],
+              "shown_ids": [
+                "HF-MED-furosemide",
+                "HF-MED-lisinopril",
+                "HF-LIFE-03",
+                "HF-LIFE-01",
+                "HF-DS-02",
+                "HF-DS-01",
+                "HF-DS-03",
+                "HF-DS-04",
+                "HF-DS-05",
+                "HF-DS-06",
+                "HF-LIFE-02"
+              ],
+              "top_k": 8
+            }
+          }
+        }
+      ],
+      "config": {
+        "compression": true,
+        "fewshot": true,
+        "ordering": true,
+        "reground": false,
+        "retrieval": true,
+        "schema": true,
+        "token_budget": null,
+        "top_k": 8
+      },
+      "name": "CE-FULL (single recorded patient)"
+    }
+  ],
+  "case_selection": {
+    "case_ids": [
+      "HF-01"
+    ],
+    "count": 1,
+    "purpose": "time-boxed live integration check, not comparative evaluation"
+  },
+  "client": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "mode": "real",
+    "model": "google/gemma-4-26b-a4b-it",
+    "provider": "openai-compatible",
+    "provider_preferences": {
+      "allow_fallbacks": false,
+      "require_parameters": true
+    },
+    "timeout_seconds": 120
+  },
+  "evidence_status": "REAL_MODEL_OUTPUTS_RECORDED",
+  "experiment": "single_patient_ce_full",
+  "generated_at_utc": "2026-07-25T15:39:37.517374+00:00",
+  "inputs": {
+    "cases_path": "/Users/mohamedyassineagourram/Desktop/HACKATHONS/GroundedRx/data/eval_cases.json",
+    "cases_sha256": "1385c266dea4df3bf6b3da9ef6c84fa3149ee358d7c355cf9955fffebb7dcf00",
+    "guidelines_path": "/Users/mohamedyassineagourram/Desktop/HACKATHONS/GroundedRx/guidelines/heart_failure.json",
+    "guidelines_sha256": "cff93d2f47c1f211282dab1f799d1aeebbaa7aaa06af9a4450ef95001179b95e"
+  },
+  "leave_one_out": [],
+  "mode": "real",
+  "privacy_note": "This artifact contains prompts, context, and raw model outputs. Do not store real patient-identifying information in a shared repository or unencrypted location.",
+  "runtime": {
+    "command": [
+      "eval/record_patient_run.py",
+      "--base-url",
+      "https://openrouter.ai/api/v1",
+      "--model",
+      "google/gemma-4-26b-a4b-it",
+      "--case-id",
+      "HF-01",
+      "--artifacts-dir",
+      "eval/runs"
+    ],
+    "git_revision": "160c99ef99a795210115c628e6d6ad5592eddd8b",
+    "platform": "macOS-26.2-arm64-arm-64bit",
+    "python": "3.9.6 (default, Jan  9 2026, 11:03:41) \n[Clang 17.0.0 (clang-1700.6.4.2)]"
+  },
+  "schema_version": "groundedrx-eval-run/v1"
+}

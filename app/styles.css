@@ -576,15 +576,7 @@ div[data-testid="stButton"] > button p { margin: 0; }
 .ico-violet { background: #f1f0fa; color: #716b9b; }
 .ico-amber { background: #fff4e9; color: #bb7d3c; }
 
-/* ---- Calendar and supporting detail ------------------------------------------ */
-.gr-cal { font-size: 12px; }
-.gr-cal .cap { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.gr-cal .mo { color: var(--ink); font-size: 13px; font-weight: 750; }
-.gr-cal table { width: 100%; border-collapse: separate; border-spacing: 2px; }
-.gr-cal th { padding: 4px 0; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-.gr-cal td { padding: 5px 0; border-radius: 8px; color: var(--body); font-size: 11px; text-align: center; }
-.gr-cal td.hl { background: linear-gradient(145deg, #3987fb, #1965e6); box-shadow: 0 5px 10px -8px rgba(30, 111, 245, 0.85); color: #fff; font-weight: 750; }
-.gr-cal td.dim { color: #c6cdd6; }
+/* ---- Supporting detail ------------------------------------------------------- */
 .gr-item { display: flex; align-items: center; gap: 13px; margin-bottom: 11px; padding: 11px 13px; border: none; border-radius: 13px; background: #fff; box-shadow: 0 11px 24px -20px rgba(45, 68, 99, 0.38); transition: box-shadow 150ms ease, transform 150ms ease; }
 .gr-item:hover { box-shadow: 0 14px 27px -20px rgba(30, 111, 245, 0.4); transform: translateY(-1px); }
 .gr-item .ico { display: flex; width: 39px; height: 39px; flex: none; align-items: center; justify-content: center; border-radius: 11px; font-size: 17px; }
@@ -773,6 +765,83 @@ table.abl tr.gr-abl-featured td { background: #edf4ff; }
 table.abl tr.gr-abl-featured td:first-child { color: #265f9d; }
 .gr-page-disclaimer { max-width: 1020px; margin: 16px auto 2px; text-align: center; }
 
+/* ---- Patient record workspace ------------------------------------------------ */
+.gr-record-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f2f6fc;
+  color: #65809e;
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+.gr-record-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 12px; }
+.gr-record-panel {
+  min-width: 0;
+  padding: 15px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #ffffff, #f7faff);
+  box-shadow: 0 12px 24px -21px rgba(45, 68, 99, 0.4);
+}
+.gr-record-cap { margin-bottom: 9px; color: #5c84ad; font-size: 9.5px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; }
+.gr-record-title { color: var(--ink); font-size: 14px; font-weight: 790; letter-spacing: -0.02em; }
+.gr-problem-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.gr-problem { padding: 6px 9px; border-radius: 10px; background: #edf5ff; color: #386b9f; font-size: 11px; font-weight: 700; }
+.gr-timeline { display: grid; gap: 10px; margin-top: 9px; }
+.gr-timeline-row { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 9px; }
+.gr-timeline-date { padding-top: 1px; color: #7f91a7; font-size: 10px; font-weight: 740; }
+.gr-timeline-title { color: var(--ink); font-size: 11.5px; font-weight: 760; }
+.gr-timeline-detail { margin-top: 2px; color: var(--body); font-size: 10.5px; line-height: 1.45; }
+.gr-file-list { display: grid; gap: 9px; margin-top: 10px; }
+.gr-file {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f7f9fc;
+  box-shadow: 0 8px 18px -17px rgba(45, 68, 99, 0.3);
+}
+.gr-file-ico { display: flex; width: 28px; height: 28px; flex: 0 0 28px; align-items: center; justify-content: center; border-radius: 9px; background: #eaf3ff; font-size: 13px; }
+.gr-file-name { overflow: hidden; color: var(--ink); font-size: 11px; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+.gr-file-meta { margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.gr-context-stage {
+  margin-top: 13px;
+  padding: 14px 15px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #f3f8ff, #edf5ff);
+  box-shadow: 0 12px 24px -21px rgba(30, 111, 245, 0.36);
+}
+.gr-context-stage-title { color: var(--ink); font-size: 13px; font-weight: 790; }
+.gr-context-stage-copy { margin-top: 3px; color: var(--body); font-size: 11.5px; line-height: 1.48; }
+.gr-context-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.gr-context-chip { padding: 5px 8px; border-radius: 9px; background: rgba(255, 255, 255, 0.82); color: #47729a; font-size: 10px; font-weight: 720; }
+.gr-run-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 13px 0 2px;
+  padding: 12px 13px;
+  border-radius: 14px;
+  background: #f7f9fc;
+  box-shadow: 0 10px 21px -19px rgba(45, 68, 99, 0.34);
+}
+.gr-run-state.real { background: linear-gradient(145deg, #eff7ff, #f7fbff); }
+.gr-run-state.error { background: linear-gradient(145deg, #fff8f9, #fff2f3); }
+.gr-run-state-icon { display: flex; width: 28px; height: 28px; flex: 0 0 28px; align-items: center; justify-content: center; border-radius: 9px; background: #e7f1ff; color: #2f70bc; font-size: 13px; }
+.gr-run-state.error .gr-run-state-icon { background: #ffeaed; color: #b0525d; }
+.gr-run-state-title { color: var(--ink); font-size: 11.5px; font-weight: 780; }
+.gr-run-state-copy { margin-top: 2px; color: var(--body); font-size: 10.5px; line-height: 1.45; }
+.gr-source-tray { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.gr-source-card { flex: 1 1 130px; min-width: 0; padding: 10px 11px; border-radius: 12px; background: #f7f9fc; box-shadow: 0 9px 19px -18px rgba(45, 68, 99, 0.3); }
+.gr-source-card .k { color: var(--muted); font-size: 9px; font-weight: 760; letter-spacing: 0.06em; text-transform: uppercase; }
+.gr-source-card .v { overflow: hidden; margin-top: 3px; color: var(--ink); font-size: 11px; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ---- Responsive polish -------------------------------------------------------- */
 @media (max-width: 1120px) {
   .gr-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -802,6 +871,8 @@ table.abl tr.gr-abl-featured td:first-child { color: #265f9d; }
   .gr-evidence-grid-two { grid-template-columns: 1fr; }
   .gr-evidence-insight { min-height: 0; }
   .gr-evidence-bar-row { grid-template-columns: minmax(72px, 0.8fr) minmax(88px, 2fr) 34px; gap: 7px; }
+  .gr-record-grid { grid-template-columns: 1fr; }
+  .gr-timeline-row { grid-template-columns: 70px minmax(0, 1fr); }
   table.abl { font-size: 10.5px; }
   table.abl th,
   table.abl td { padding: 8px 6px; }

@@ -95,7 +95,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mock", action="store_true", help="use the no-network stub model")
     ap.add_argument("--base-url", default=None, help="OpenAI-compatible endpoint (e.g. http://localhost:11434/v1)")
-    ap.add_argument("--model", default=None, help="model id (e.g. gemma4:e4b)")
+    ap.add_argument("--model", default=None, help="model id (e.g. gemma4:e4b, google/gemma-4-31b-it)")
+    ap.add_argument("--api-key", default=None, help="cloud API key (else uses $GROUNDEDRX_API_KEY / $OPENAI_API_KEY)")
     ap.add_argument("--guidelines", default=os.path.join(ROOT, "guidelines", "heart_failure.json"))
     ap.add_argument("--cases", default=os.path.join(ROOT, "data", "eval_cases.json"))
     ap.add_argument("--json-out", default=None, help="optional path to dump raw results as JSON")
@@ -108,7 +109,8 @@ def main():
 
     corpus = GuidelineCorpus.load(args.guidelines)
     cases = load_cases(args.cases)
-    client = make_client(args.mock, base_url=args.base_url, model=args.model, schema=PLAN_SCHEMA)
+    client = make_client(args.mock, base_url=args.base_url, model=args.model, schema=PLAN_SCHEMA,
+                         api_key=args.api_key)
 
     mode = "MOCK (stub model)" if args.mock else f"REAL ({args.model} @ {args.base_url})"
     print(f"\nGroundedRx ablation  |  {mode}  |  {len(cases)} cases, {len(corpus.passages)} corpus passages\n")

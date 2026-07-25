@@ -134,18 +134,26 @@ def _plot(naive, eng, out, mock):
     except ImportError:
         print("(matplotlib not installed; skipping PNG)")
         return
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    ax.plot(POSITIONS, naive, "s-", color="#b23a48", lw=2.2, label="Naive (raw dump)")
-    ax.plot(POSITIONS, eng, "o-", color="#1a7f5a", lw=2.2, label="Engineered (ordering to edges)")
+    fig, ax = plt.subplots(figsize=(7, 4.5), facecolor="#ffffff")
+    ax.set_facecolor("#fbfcff")
+    ax.plot(POSITIONS, naive, "s-", color="#dc6875", lw=2.2, label="Naive (raw dump)")
+    ax.plot(POSITIONS, eng, "o-", color="#1f6feb", lw=2.4, label="Engineered (ordering to edges)")
     ax.set_xlabel("Position of required danger-sign in context (0=start, 1=end)")
     ax.set_ylabel("Danger-sign recall (%)")
     ax.set_ylim(-5, 105)
     title = "Lost-in-the-middle: position robustness"
     if mock:
         title += "  (MOCK — illustrative)"
-    ax.set_title(title)
-    ax.legend(fontsize=9)
-    ax.grid(alpha=0.3)
+    ax.set_title(title, color="#172033", fontweight="bold")
+    ax.legend(fontsize=9, frameon=False)
+    ax.grid(color="#e8eef8", alpha=1)
+    ax.tick_params(colors="#718096")
+    ax.xaxis.label.set_color("#637084")
+    ax.yaxis.label.set_color("#637084")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color("#dfe7f2")
+    ax.spines["bottom"].set_color("#dfe7f2")
     fig.tight_layout()
     fig.savefig(out, dpi=140)
 

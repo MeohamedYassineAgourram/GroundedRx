@@ -1,9 +1,9 @@
 """Generate a single self-contained GroundedRx.html (open directly in a browser -- no server).
 
-Bakes in, from the REAL pipeline (mock backend): every patient case, its grounded aftercare
-plan + metrics, a per-case context graph (inline SVG), the corpus (for a client-side grounded
-copilot), the additive ablation table, and the frontier / lost-in-the-middle charts (embedded
-as base64 data URIs). All logic/data come from src/ and data/ -- this only renders them.
+Bakes in, from the REAL pipeline (mock backend): three patient examples, their grounded
+aftercare plans, the corpus (for a client-side grounded copilot), the additive ablation table,
+and the frontier / lost-in-the-middle charts (embedded as base64 data URIs). All logic/data
+come from src/ and data/ -- this only renders them.
 
     python app/build_static.py      # -> writes GroundedRx.html at the repo root
 """
@@ -12,95 +12,38 @@ from __future__ import annotations
 import base64
 import html as H
 import json
-import math
 import os
-import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from eval.metrics import citation_faithfulness, danger_recall, has_hallucination, score_run
+from eval.metrics import score_run
+from app.ui_helpers import identity as display_identity
 from src import pipeline
 from src.model_client import make_client
 from src.prompts import PLAN_SCHEMA
 from src.retrieval import GuidelineCorpus
 
 esc = H.escape
-_TS = {"danger_sign": ("#dc2626", "#fef2f2"), "medication": ("#2563eb", "#eff6ff"),
-       "lifestyle": ("#16a34a", "#f0fdf4")}
-
-
-def short(p):
-    if p["type"] == "danger_sign":
-        return "DS" + p["id"].split("-")[-1]
-    if p["type"] == "medication":
-        return (p.get("drug") or p["id"])[:5]
-    if p["type"] == "lifestyle":
-        return "LF" + p["id"].split("-")[-1]
-    return p["id"][:4]
-
-
-def graph_svg(case, corpus, nodes):
-    W, Hh, cx, cy, R = 720, 360, 360, 178, 132
-    n = max(1, len(nodes))
-    edges, circles = [], []
-    for i, p in enumerate(nodes):
-        a = -math.pi / 2 + 2 * math.pi * i / n
-        x, y = cx + R * math.cos(a), cy + R * math.sin(a)
-        s, f = _TS.get(p["type"], ("#64748b", "#f1f5f9"))
-        edges.append(f"<line x1='{cx}' y1='{cy}' x2='{x:.0f}' y2='{y:.0f}' stroke='#e2e8f0' stroke-width='1.5'/>")
-        circles.append(
-            f"<g><title>{esc(p.get('text',''))}</title>"
-            f"<circle cx='{x:.0f}' cy='{y:.0f}' r='21' fill='{f}' stroke='{s}' stroke-width='2'/>"
-            f"<text x='{x:.0f}' y='{y+3:.0f}' text-anchor='middle' font-size='9' font-weight='700' fill='{s}'>{esc(short(p))}</text></g>")
-    age = (re.findall(r"\d+", case["profile"]) or ["?"])[0]
-    center = (f"<circle cx='{cx}' cy='{cy}' r='34' fill='#0f172a'/>"
-              f"<text x='{cx}' y='{cy-2}' text-anchor='middle' font-size='13' font-weight='800' fill='#fff'>{age}y</text>"
-              f"<text x='{cx}' y='{cy+12}' text-anchor='middle' font-size='8' fill='#cbd5e1'>PATIENT</text>")
-    pruned = sum(1 for p in corpus.passages if p["type"] == "distractor")
-    head = (f"<div class='ghead'>🧠 Dynamic Clinical Context Graph"
-            f"<span class='gmeta'>{len(nodes)} chunks retrieved · {pruned} distractors pruned</span></div>")
-    legend = ("<div class='glegend'>"
-              "<span><i style='background:#dc2626'></i>Danger sign</span>"
-              "<span><i style='background:#2563eb'></i>Medication</span>"
-              "<span><i style='background:#16a34a'></i>Lifestyle</span></div>")
-    return (head + f"<svg viewBox='0 0 {W} {Hh}' width='100%' style='display:block'>"
-            + "".join(edges) + center + "".join(circles) + "</svg>" + legend)
 
 
 def build():
     corpus = GuidelineCorpus.load(os.path.join(ROOT, "guidelines", "heart_failure.json"))
     cases = json.load(open(os.path.join(ROOT, "data", "eval_cases.json")))["cases"]
+    example_cases = cases[:3]
     client = make_client(True, schema=PLAN_SCHEMA)
 
     data = {}
-    for c in cases:
+    for idx, c in enumerate(example_cases):
         res = pipeline.run_case(c, corpus, client, pipeline.FULL)
         plan = res["plan"]
-        # graph nodes = the sources the plan actually cites (grounded provenance) + all danger signs
-        cited = []
-        seen = set()
-        for section in ("danger_signs", "medications", "lifestyle"):
-            for it in plan.get(section, []):
-                pid = it.get("guideline_id")
-                if pid and pid in corpus.by_id and pid not in seen:
-                    seen.add(pid)
-                    cited.append(corpus.by_id[pid])
-        for d in corpus.danger_signs:
-            if d["id"] not in seen:
-                seen.add(d["id"])
-                cited.append(d)
+        display = display_identity(c["id"], c["profile"], tuple(c["meds"]), idx)
         data[c["id"]] = {
             "profile": c["profile"], "meds": c["meds"], "forbidden": c["forbidden_terms"],
+            "patient": {"name": display["name"], "age": display["age"], "sex": display["sex"],
+                        "followup": display["followup"].strftime("%b %d")},
             "plan": plan,
-            "metrics": {
-                "recall": round(danger_recall(plan, c, corpus) * 100),
-                "halluc": has_hallucination(plan, c, corpus),
-                "faith": round(citation_faithfulness(plan, corpus) * 100),
-                "tokens": res["ctx_tokens"],
-            },
-            "svg": graph_svg(c, corpus, cited),
         }
 
     # corpus map for copilot tooltips + client-side grounded retrieval (real passages only)
@@ -127,7 +70,7 @@ def build():
     litm_uri = data_uri(os.path.join(ROOT, "slides", "lost_in_middle.png"))
     css = open(os.path.join(ROOT, "app", "styles.css")).read()
 
-    payload = {"cases": data, "order": [c["id"] for c in cases], "corpus": corpus_map,
+    payload = {"cases": data, "order": [c["id"] for c in example_cases], "corpus": corpus_map,
                "real": real_passages, "ablation": ablation}
 
     html = TEMPLATE.replace("/*CSS*/", css) \
@@ -149,49 +92,42 @@ TEMPLATE = r"""<!doctype html>
 /*CSS*/
 /* standalone layout (no Streamlit) */
 body { margin:0; padding:18px 24px 40px; }
-.grid { display:grid; grid-template-columns:1fr 2.5fr 1.5fr; gap:16px; align-items:start; }
+.grid { display:grid; grid-template-columns:.85fr 2.8fr 1.3fr; gap:16px; align-items:start; }
 @media (max-width:1100px){ .grid{ grid-template-columns:1fr; } }
-.pat-row{ width:100%; text-align:left; background:rgba(255,255,255,0.65); border:1px solid var(--border); border-radius:14px;
-  padding:11px 13px; margin-bottom:8px; color:var(--body); font-weight:500; cursor:pointer; transition:all .16s; font-size:13px; }
-.pat-row:hover{ border-color:#c7dbff; background:#f4f8ff; color:var(--ink); transform:translateY(-1px);
-  box-shadow:0 10px 20px -12px rgba(79,124,255,.5); }
-.pat-row.active{ border-color:#4f7cff; background:#eef4ff; color:#3b6fe0; font-weight:600;
-  box-shadow:0 10px 20px -12px rgba(79,124,255,.5); }
-.ghead{ background:linear-gradient(135deg, rgba(238,242,253,0.95), rgba(241,236,251,0.95)); border:1px solid var(--glass-edge);
-  border-radius:14px; padding:11px 15px; font-weight:700; color:var(--ink); font-size:15px; margin-bottom:14px;
-  display:flex; align-items:center; justify-content:space-between; }
-.gmeta{ font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
-.glegend{ display:flex; gap:16px; justify-content:center; margin-top:6px; font-size:12px; color:#475569; }
-.glegend i{ display:inline-block; width:9px; height:9px; border-radius:9999px; margin-right:5px; }
-svg text{ font-family:system-ui,-apple-system,sans-serif; }
+ .pat-row{ display:flex; flex-direction:column; align-items:flex-start; width:100%; min-height:104px; box-sizing:border-box; text-align:left; background:#fff; border:none; border-radius:18px;
+  padding:15px 16px; margin-bottom:12px; color:#687385; font-weight:500; cursor:pointer; transition:all .16s; box-shadow:0 12px 24px -20px rgba(45,68,99,.48); }
+ .pat-row:hover{ border-color:transparent; background:#f8fbff; color:#687385; transform:translateY(-1px);
+  box-shadow:0 10px 20px -18px rgba(30,111,245,.46); }
+ .pat-row.active{ min-height:126px; border:none; background:#edf4ff; color:#687385; font-weight:500;
+  box-shadow:0 15px 27px -20px rgba(30,111,245,.44); }
+ .pat-name{ display:block; margin-bottom:3px; color:#171b24; font-size:15px; font-weight:780; letter-spacing:-.02em; }
+ .pat-meta,.pat-reason{ display:block; color:#687385; font-size:12.5px; line-height:1.72; }
+ .pat-followup{ display:none; width:100%; box-sizing:border-box; margin-top:10px; padding:8px 10px; border:none; border-radius:11px; background:#fff; box-shadow:0 8px 16px -14px rgba(30,111,245,.35); color:#4f78a0; font-size:11.5px; font-weight:700; }
+ .pat-row.active .pat-followup{ display:block; }
 .copilot-input{ display:flex; gap:8px; margin-top:10px; }
 .copilot-input input{ flex:1; border:1px solid var(--border); border-radius:10px; padding:9px 12px; font-size:13.5px;
   font-family:var(--font); color:var(--body); outline:none; }
-.copilot-input input:focus{ border-color:#93c5fd; }
-.copilot-input button{ background:var(--primary); color:#fff; border:none; border-radius:10px; padding:0 14px;
+ .copilot-input input:focus{ border-color:#9bc2fa; }
+ .copilot-input button{ background:var(--primary); color:#fff; border:none; border-radius:10px; padding:0 14px;
   font-weight:700; cursor:pointer; }
-.ev-btns{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
-.ev-btn{ background:#f1f5f9; border:1px solid var(--border); color:#475569; border-radius:9999px; padding:5px 13px;
-  font-size:12px; font-weight:600; cursor:pointer; }
-.ev-btn.active{ background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
-.ev-panel{ display:none; } .ev-panel.show{ display:block; }
-table.abl{ width:100%; border-collapse:collapse; font-size:12px; }
-table.abl th{ text-align:left; color:var(--muted); text-transform:uppercase; font-size:10px; letter-spacing:.05em;
-  padding:6px 8px; border-bottom:1px solid var(--border); }
-table.abl td{ padding:7px 8px; border-bottom:1px dashed #eef2f7; color:var(--body); }
-table.abl td.g{ color:#047857; font-weight:700; } table.abl td.r{ color:#dc2626; font-weight:700; }
-.ev-panel img{ width:100%; border-radius:12px; border:1px solid var(--border); }
 </style></head>
 <body>
 <div class="gr-topbar">
   <div class="gr-brand"><div class="gr-logo">💊</div>
     <div><div class="gr-brand-title">GroundedRx</div>
     <div class="gr-brand-sub">Context-engineered aftercare · grounded to source · privacy-preserving</div></div></div>
+  <nav class="gr-nav-tabs" aria-label="Primary navigation">
+    <button type="button" class="gr-nav-link active" data-view="workspace" aria-current="page"
+      onclick="showView('workspace')">Care workspace</button>
+    <button type="button" class="gr-nav-link" data-view="evidence" aria-current="false"
+      onclick="showView('evidence')">Evidence</button>
+  </nav>
   <div style="display:flex;align-items:center;gap:12px">
     <span class="gr-pill gr-pill-ground"><span class="gr-live"></span>Gemma 4 E4B · Offline</span>
     <span class="gr-switch" title="On-device inference"></span>
   </div>
 </div>
+<main id="workspace-view" class="gr-view">
 <div class="grid">
   <div>
     <div class="gr-card"><div class="gr-card-head">👥 Patient Directory</div><div id="directory"></div></div>
@@ -204,47 +140,90 @@ table.abl td.g{ color:#047857; font-weight:700; } table.abl td.r{ color:#dc2626;
       <div class="gr-disclaimer">Illustrative / synthetic guidelines. Not clinical advice. Assistive, human-in-the-loop; defers to the care team. Metrics shown are from the mock harness pending real-model runs.</div></div>
   </div>
   <div>
-    <div class="gr-card"><div id="graph"></div></div>
     <div class="gr-card" id="plan"></div>
   </div>
   <div>
-    <div class="gr-card"><div class="gr-card-head">💬 Clinical AI Copilot</div>
+    <div class="gr-card gr-copilot-card"><div class="gr-card-head">💬 Clinical AI Copilot</div>
       <div class="gr-disclaimer" style="margin-top:-6px;margin-bottom:10px">Answers are grounded in cited guideline passages (client-side retrieval, fully offline).</div>
       <div id="chat"></div>
       <div class="copilot-input"><input id="q" placeholder="Ask about danger signs, meds, lifestyle…"
         onkeydown="if(event.key==='Enter')ask()"><button onclick="ask()">Ask</button></div></div>
-    <div class="gr-card"><div class="gr-card-head">📊 Evidence Drawer</div>
-      <div class="gr-disclaimer" style="margin-top:-6px;margin-bottom:8px">One-click proof the context engineering pays off.</div>
-      <div class="ev-btns">
-        <button class="ev-btn active" onclick="evShow('abl',this)">Ablation table</button>
-        <button class="ev-btn" onclick="evShow('front',this)">Efficiency frontier</button>
-        <button class="ev-btn" onclick="evShow('litm',this)">Lost-in-the-middle</button></div>
-      <div id="ev-abl" class="ev-panel show"></div>
-      <div id="ev-front" class="ev-panel"><img src="__FRONTIER__" alt="frontier"></div>
-      <div id="ev-litm" class="ev-panel"><img src="__LITM__" alt="lost in the middle"></div></div>
   </div>
 </div>
+</main>
+<main id="evidence-view" class="gr-view gr-evidence-page" hidden aria-labelledby="evidence-title">
+  <section class="gr-evidence-hero">
+    <div><div class="gr-evidence-eyebrow">Evaluation workspace</div>
+      <div id="evidence-title" class="gr-evidence-title">Evidence, made easy to read.</div>
+      <div class="gr-evidence-copy">A clear, reproducible view of how the context pipeline affects safety,
+        grounding, and efficiency across the evaluation harness.</div></div>
+    <div class="gr-evidence-hero-badge"><span class="gr-live"></span>Mock harness · offline</div>
+  </section>
+  <section id="evidence-kpis" class="gr-evidence-kpis" aria-label="Evaluation summary"></section>
+  <div class="gr-evidence-grid">
+    <section class="gr-card">
+      <div class="gr-evidence-card-head"><div><div class="gr-evidence-card-kicker">Quality progression</div>
+        <div class="gr-evidence-card-title">Layer-by-layer ablation</div></div>
+        <span class="gr-pill gr-pill-ground">all stages</span></div>
+      <div id="evidence-quality" class="gr-evidence-bars"></div>
+      <div class="gr-evidence-chart-note">Each row adds one context-engineering layer, keeping the quality
+        trade-offs visible rather than hiding them in a single score.</div>
+    </section>
+    <aside id="evidence-takeaway" class="gr-evidence-insight"></aside>
+  </div>
+  <div class="gr-evidence-grid gr-evidence-grid-two">
+    <section class="gr-card">
+      <div class="gr-evidence-card-head"><div><div class="gr-evidence-card-kicker">Efficiency</div>
+        <div class="gr-evidence-card-title">Efficiency frontier</div></div>
+        <span class="gr-pill gr-pill-med">tokens vs. recall</span></div>
+      <img class="gr-evidence-image" src="__FRONTIER__"
+        alt="Efficiency frontier comparing context tokens and accuracy for engineered and naive RAG">
+      <div class="gr-evidence-chart-note">Compare the accuracy reached at each tested context budget.</div>
+    </section>
+    <section class="gr-card">
+      <div class="gr-evidence-card-head"><div><div class="gr-evidence-card-kicker">Robustness</div>
+        <div class="gr-evidence-card-title">Lost in the middle</div></div>
+        <span class="gr-pill gr-pill-life">fact position</span></div>
+      <img class="gr-evidence-image" src="__LITM__"
+        alt="Lost-in-the-middle chart comparing recall by fact position">
+      <div class="gr-evidence-chart-note">Tests whether key safety facts remain available when their position changes.</div>
+    </section>
+  </div>
+  <section class="gr-card">
+    <div class="gr-evidence-card-head"><div><div class="gr-evidence-card-kicker">Experiment details</div>
+      <div class="gr-evidence-card-title">All evaluated stages</div></div>
+      <span class="gr-pill gr-pill-muted">reproducible run</span></div>
+    <div id="ev-table"></div>
+  </section>
+  <div class="gr-disclaimer gr-page-disclaimer">⚠️ Illustrative / synthetic guidelines and patient identities.
+    Not clinical advice. Assistive, human-in-the-loop; defers to the care team. Metrics are from the mock harness
+    pending real-model runs.</div>
+</main>
 <script>
 const D = __DATA__;
 let active = D.order[0];
 const byId = D.corpus;
+let reviewed = {};
 
 function directory(){
   const el = document.getElementById('directory'); el.innerHTML='';
   D.order.forEach(id=>{
     const c = D.cases[id];
-    const age = (c.profile.match(/\d+/)||['?'])[0];
-    const reg = c.meds.slice(0,2).join('+') + (c.meds.length>2?'…':'');
+    const patient = c.patient;
     const div = document.createElement('div');
     div.className = 'pat-row' + (id===active?' active':'');
-    div.textContent = `${id}  ·  ${age}y  ·  ${reg}`;
+    const name = document.createElement('span'); name.className = 'pat-name'; name.textContent = patient.name;
+    const meta = document.createElement('span'); meta.className = 'pat-meta'; meta.textContent = `${patient.age} · ${patient.sex}`;
+    const reason = document.createElement('span'); reason.className = 'pat-reason'; reason.textContent = 'Heart-failure aftercare';
+    const followup = document.createElement('span'); followup.className = 'pat-followup'; followup.textContent = `Follow-up · ${patient.followup}`;
+    div.append(name, meta, reason, followup);
     div.onclick = ()=>{ active=id; render(); };
     el.appendChild(div);
   });
 }
 function rows(items, kind){
   const dot = {danger:'gr-dot-danger', med:'gr-dot-med', life:'gr-dot-life'}[kind];
-  if(!items.length) return "<div class='gr-row'>—</div>";
+  if(!items.length) return "<div class='gr-row gr-row-empty'>No additional guidance is listed here.</div>";
   return items.map(it=>{
     const cid = it.guideline_id||'';
     const src = byId[cid];
@@ -257,33 +236,41 @@ function rows(items, kind){
     return `<div class='${rc}'><span class='gr-dot ${dot}'></span><div>${txt}${cite}</div></div>`;
   }).join('');
 }
-function ring(pct, color, center){
-  const r=25, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,pct))/100);
-  return `<svg width="62" height="62" viewBox="0 0 62 62">
-    <circle cx="31" cy="31" r="${r}" fill="none" stroke="#edf0f7" stroke-width="7"/>
-    <circle cx="31" cy="31" r="${r}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round"
-      stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 31 31)"/>
-    <text x="31" y="36" text-anchor="middle" class="cv">${center}</text></svg>`;
+function planSection(title, copy, items, kind, icon, step){
+  return "<section class='gr-plan-section gr-plan-section-" + kind + "'>"
+    + "<div class='gr-plan-section-head'><span class='gr-plan-step'>" + step + "</span><div>"
+    + "<div class='gr-plan-title'>" + icon + " " + title + "</div>"
+    + "<div class='gr-plan-copy'>" + copy + "</div></div></div>"
+    + "<div class='gr-plan-rows'>" + rows(items, kind) + "</div></section>";
+}
+function reviewPlan(){
+  reviewed[active] = !reviewed[active];
+  plan();
 }
 function plan(){
-  const c = D.cases[active], m = c.metrics;
-  const save = Math.round(100*(1 - m.tokens/2685));
-  document.getElementById('plan').innerHTML = `
-    <div class='gr-card-head'>📋 Grounded Aftercare Plan
-      <span class='gr-pill gr-pill-ground' style='margin-left:auto'>context-engineered</span></div>
-    <div class='gr-label'>Patient</div>
-    <div style='font-size:15px;font-weight:600;color:var(--ink)'>${c.profile}</div>
-    <div style='font-size:12.5px;color:var(--muted);margin-bottom:16px'>Prescribed: ${c.meds.join(', ')}</div>
-    <div class='gr-gauges'>
-      <div class='gr-gauge'>${ring(m.recall,'#34d399',m.recall+'%')}<div class='lab'>Danger recall</div></div>
-      <div class='gr-gauge'>${ring(m.halluc?100:100, m.halluc?'#f43f5e':'#34d399', m.halluc?'!':'✓')}<div class='lab'>Hallucination</div></div>
-      <div class='gr-gauge'>${ring(m.faith,'#4f7cff',m.faith+'%')}<div class='lab'>Citation faith</div></div>
-      <div class='gr-gauge'>${ring(save,'#a78bfa',m.tokens)}<div class='lab'>Ctx tokens · −${save}%</div></div></div>
-    <div class='gr-label' style='margin-top:18px'>🚨 Danger signs — seek care if you notice</div>${rows(c.plan.danger_signs,'danger')}
-    <div class='gr-label' style='margin-top:16px'>💊 Prescribed medications & guidance</div>${rows(c.plan.medications,'med')}
-    <div class='gr-label' style='margin-top:16px'>🥗 Lifestyle & follow-up</div>${rows(c.plan.lifestyle,'life')}`;
+  const c = D.cases[active];
+  const done = Boolean(reviewed[active]);
+  const reviewLabel = done ? "✓ Plan reviewed" : "I've reviewed this plan";
+  const reviewNote = done
+    ? "Marked as reviewed in this browser. This does not change your care."
+    : "This is a personal reminder only — it does not update your care team.";
+  document.getElementById('plan').innerHTML =
+    "<div class='gr-card-head'>📋 Your Aftercare Plan"
+      + "<span class='gr-pill gr-pill-ground' style='margin-left:auto'>your guide</span></div>"
+    + "<div class='gr-plan-intro'>Take this one step at a time. These are the key things to watch for, take, and do before your planned follow-up.</div>"
+    + "<div class='gr-plan-guide'><div class='gr-plan-guide-label'>Your next step</div>"
+      + "<div class='gr-plan-guide-title'>Planned follow-up · " + c.patient.followup + "</div>"
+      + "<div class='gr-plan-guide-copy'>Keep this plan nearby and ask your care team if anything is unclear.</div></div>"
+    + planSection("When to get help", "These changes may mean you need to contact your care team.",
+      c.plan.danger_signs, "danger", "🚨", "1")
+    + planSection("Your medicines", "Use these instructions alongside the labels from your care team.",
+      c.plan.medications, "med", "💊", "2")
+    + planSection("Everyday care & follow-up", "Small steps to support your recovery before your next visit.",
+      c.plan.lifestyle, "life", "🥗", "3")
+    + "<button type='button' class='gr-review-btn' aria-pressed='" + done + "' onclick='reviewPlan()'>"
+      + reviewLabel + "</button>"
+    + "<div class='gr-plan-note'>" + reviewNote + "</div>";
 }
-function graph(){ document.getElementById('graph').innerHTML = D.cases[active].svg; }
 
 let chat = [];
 function renderChat(){
@@ -306,21 +293,74 @@ function ask(){
   chat.push({r:'user', t:q}); chat.push({r:'bot', t:ans}); inp.value=''; renderChat();
   document.getElementById('chat').scrollTop = 1e9;
 }
-function evShow(which, btn){
-  document.querySelectorAll('.ev-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
-  document.querySelectorAll('.ev-panel').forEach(p=>p.classList.remove('show'));
-  document.getElementById('ev-'+which).classList.add('show');
+function evidenceKpi(icon, value, label, detail, tone){
+  return "<article class='gr-evidence-kpi gr-evidence-kpi-" + tone + "'>"
+    + "<div class='gr-evidence-kpi-icon'>" + icon + "</div><div>"
+    + "<div class='gr-evidence-kpi-value'>" + value + "</div>"
+    + "<div class='gr-evidence-kpi-label'>" + label + "</div>"
+    + "<div class='gr-evidence-kpi-detail'>" + detail + "</div></div></article>";
 }
-function ablation(){
-  const rows = D.ablation.map(r=>`<tr><td>${r.config}</td>
-    <td class='g'>${r.recall}%</td><td class='${r.halluc>0?'r':'g'}'>${r.halluc}%</td>
-    <td class='g'>${r.faith}%</td><td>${r.tokens}</td></tr>`).join('');
-  document.getElementById('ev-abl').innerHTML =
-    `<table class='abl'><tr><th>config</th><th>recall</th><th>halluc</th><th>faith</th><th>ctx tok</th></tr>${rows}</table>
-     <div class='gr-disclaimer' style='margin-top:8px'>Context engineering alone (through +fewshot) drives the win; re-grounding is an optional final refinement.</div>`;
+function renderEvidence(){
+  const stages = D.ablation;
+  const featured = stages[stages.length - 1];
+  const bestRecall = Math.max.apply(null, stages.map(r=>r.recall));
+  const lowestHalluc = Math.min.apply(null, stages.map(r=>r.halluc));
+  const bestFaith = Math.max.apply(null, stages.map(r=>r.faith));
+  const leanestContext = Math.min.apply(null, stages.map(r=>r.tokens));
+  document.getElementById('evidence-kpis').innerHTML = [
+    evidenceKpi("🛟", bestRecall + "%", "Best danger recall", "best evaluated stage", "blue"),
+    evidenceKpi("✓", lowestHalluc + "%", "Unsupported output", "lower is better", "slate"),
+    evidenceKpi("🔗", bestFaith + "%", "Source faithfulness", "highest evaluated stage", "violet"),
+    evidenceKpi("⚡", leanestContext.toLocaleString(), "Context budget", "smallest tested stage", "rose")
+  ].join('');
+  document.getElementById('evidence-quality').innerHTML = stages.map(r =>
+    "<div class='gr-evidence-bar-row'><div class='gr-evidence-bar-label' title='" + r.config + "'>"
+      + r.config + "</div><div class='gr-evidence-bar-track'><span class='gr-evidence-bar-fill' style='width:"
+      + r.recall + "%'></span></div><div class='gr-evidence-bar-value'>" + r.recall + "%</div></div>"
+  ).join('');
+  document.getElementById('evidence-takeaway').innerHTML =
+    "<div class='gr-evidence-insight-kicker'>What this shows</div>"
+    + "<div class='gr-evidence-insight-title'>Better context, not simply more context.</div>"
+    + "<p>The dashboard keeps reliability, source grounding, and token cost together so the trade-offs are easy to compare.</p>"
+    + "<div class='gr-evidence-insight-stats'><div><strong>" + featured.recall + "%</strong><span>danger recall</span></div>"
+    + "<div><strong>" + featured.faith + "%</strong><span>source faithfulness</span></div>"
+    + "<div><strong>" + featured.tokens.toLocaleString() + "</strong><span>context tokens</span></div></div>";
+  const rows = stages.map(r => {
+    const featuredRow = r.config === featured.config ? " gr-abl-featured" : "";
+    const hallucClass = r.halluc > 0 ? "r" : "g";
+    return "<tr class='" + featuredRow.trim() + "'><td>" + r.config + "</td><td class='g'>" + r.recall
+      + "%</td><td class='" + hallucClass + "'>" + r.halluc + "%</td><td class='g'>" + r.faith
+      + "%</td><td>" + r.tokens.toLocaleString() + "</td></tr>";
+  }).join('');
+  document.getElementById('ev-table').innerHTML =
+    "<table class='abl gr-evidence-table'><tr><th>stage</th><th>danger recall</th><th>unsupported output</th>"
+    + "<th>source faithfulness</th><th>context tokens</th></tr>" + rows + "</table>";
 }
-function render(){ directory(); graph(); plan(); }
-render(); renderChat(); ablation();
+function viewFromHash(){
+  return typeof window !== 'undefined' && window.location.hash === '#evidence' ? 'evidence' : 'workspace';
+}
+function showView(view, updateHash){
+  const next = view === 'evidence' ? 'evidence' : 'workspace';
+  const workspace = document.getElementById('workspace-view');
+  const evidence = document.getElementById('evidence-view');
+  workspace.hidden = next !== 'workspace';
+  evidence.hidden = next !== 'evidence';
+  workspace.setAttribute('aria-hidden', String(next !== 'workspace'));
+  evidence.setAttribute('aria-hidden', String(next !== 'evidence'));
+  document.querySelectorAll('.gr-nav-link').forEach(button => {
+    const activeView = button.dataset.view === next;
+    button.classList.toggle('active', activeView);
+    button.setAttribute('aria-current', activeView ? 'page' : 'false');
+  });
+  if(updateHash !== false && typeof window !== 'undefined'){
+    try { window.history.replaceState(null, '', '#' + next); }
+    catch (error) { window.location.hash = next; }
+    if(window.scrollTo) window.scrollTo(0, 0);
+  }
+}
+function render(){ directory(); plan(); }
+render(); renderChat(); renderEvidence(); showView(viewFromHash(), false);
+if(typeof window !== 'undefined') window.addEventListener('hashchange', () => showView(viewFromHash(), false));
 </script>
 </body></html>"""
 

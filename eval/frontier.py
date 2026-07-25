@@ -93,20 +93,28 @@ def _plot(eng_x, eng_r, eng_f, naive_x, naive_r, naive_f, out, mock):
     except ImportError:
         print("(matplotlib not installed; skipping PNG)")
         return
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    ax.plot(eng_x, eng_r, "o-", color="#1a7f5a", lw=2.2, label="Engineered — danger recall")
-    ax.plot(eng_x, eng_f, "o--", color="#4fb286", lw=1.6, label="Engineered — citation faithfulness")
-    ax.plot(naive_x, naive_r, "s-", color="#b23a48", lw=2.2, label="Naive RAG — danger recall")
-    ax.plot(naive_x, naive_f, "s--", color="#d98a94", lw=1.6, label="Naive RAG — citation faithfulness")
+    fig, ax = plt.subplots(figsize=(7, 4.5), facecolor="#ffffff")
+    ax.set_facecolor("#fbfcff")
+    ax.plot(eng_x, eng_r, "o-", color="#1f6feb", lw=2.4, label="Engineered — danger recall")
+    ax.plot(eng_x, eng_f, "o--", color="#7aa9f7", lw=1.8, label="Engineered — citation faithfulness")
+    ax.plot(naive_x, naive_r, "s-", color="#dc6875", lw=2.2, label="Naive RAG — danger recall")
+    ax.plot(naive_x, naive_f, "s--", color="#e9adb6", lw=1.6, label="Naive RAG — citation faithfulness")
     ax.set_xlabel("Average context tokens (lower = cheaper)")
     ax.set_ylabel("Accuracy (%)")
     ax.set_ylim(-5, 105)
     title = "GroundedRx efficiency frontier"
     if mock:
         title += "  (MOCK — illustrative)"
-    ax.set_title(title)
-    ax.legend(fontsize=8, loc="center right")
-    ax.grid(alpha=0.3)
+    ax.set_title(title, color="#172033", fontweight="bold")
+    ax.legend(fontsize=8, loc="center right", frameon=False)
+    ax.grid(color="#e8eef8", alpha=1)
+    ax.tick_params(colors="#718096")
+    ax.xaxis.label.set_color("#637084")
+    ax.yaxis.label.set_color("#637084")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color("#dfe7f2")
+    ax.spines["bottom"].set_color("#dfe7f2")
     fig.tight_layout()
     fig.savefig(out, dpi=140)
 

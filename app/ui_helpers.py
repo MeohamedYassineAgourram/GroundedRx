@@ -9,8 +9,8 @@ import html as _html
 import math
 import re
 
-C_ENG, C_NAIVE, C_BLUE, C_VIOLET = "#34d399", "#f43f5e", "#4f7cff", "#a78bfa"
-AV_COLORS = ["#5a86ff", "#7c6cf0", "#0ea5e9", "#0d9488", "#8b5cf6", "#2563eb", "#0891b2", "#6366f1"]
+C_ENG, C_NAIVE, C_BLUE, C_VIOLET = "#1f6feb", "#f04438", "#4d8df5", "#7c5cfc"
+AV_COLORS = ["#4d8df5", "#6b8fb8", "#5f9bea", "#537da9", "#8b82ad", "#4775a8", "#5b89be", "#7587ad"]
 
 NAMES = [
     ("James Carter", "M"), ("Angelica Monica", "F"), ("Robert Hughes", "M"), ("Maria Alvarez", "F"),
@@ -67,10 +67,10 @@ def ring_svg(pct, color, center, size=62):
     c = 2 * math.pi * r
     off = c * (1 - max(0, min(100, pct)) / 100)
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 62 62'>"
-            f"<circle cx='31' cy='31' r='25' fill='none' stroke='#edf0f7' stroke-width='7'/>"
+            f"<circle cx='31' cy='31' r='25' fill='none' stroke='#e8eef8' stroke-width='7'/>"
             f"<circle cx='31' cy='31' r='25' fill='none' stroke='{color}' stroke-width='7' stroke-linecap='round' "
             f"stroke-dasharray='{c:.1f}' stroke-dashoffset='{off:.1f}' transform='rotate(-90 31 31)'/>"
-            f"<text x='31' y='36' text-anchor='middle' font-size='14' font-weight='800' fill='#1c2340'>{esc(center)}</text></svg>")
+            f"<text x='31' y='36' text-anchor='middle' font-size='14' font-weight='800' fill='#172033'>{esc(center)}</text></svg>")
 
 
 def calendar_html(d, highlight):
@@ -93,7 +93,7 @@ def calendar_html(d, highlight):
             f"<table><tr>{head}</tr>{rows}</table></div>")
 
 
-_TS = {"danger_sign": ("#f43f5e", "#fff1f2"), "medication": ("#4f7cff", "#eef4ff"), "lifestyle": ("#22c55e", "#ecfdf3")}
+_TS = {"danger_sign": ("#f04438", "#fef3f2"), "medication": ("#1f6feb", "#eff6ff"), "lifestyle": ("#7c5cfc", "#f5f3ff")}
 
 
 def short(p):
@@ -110,21 +110,21 @@ def graph_html(corpus, nodes):
         a = -math.pi / 2 + 2 * math.pi * i / n
         x, y = cx + R * math.cos(a), cy + R * math.sin(a)
         s, f = _TS.get(p["type"], ("#64748b", "#f1f5f9"))
-        edges.append(f"<line x1='{cx}' y1='{cy}' x2='{x:.0f}' y2='{y:.0f}' stroke='#e5e9f5' stroke-width='1.5'/>")
+        edges.append(f"<line x1='{cx}' y1='{cy}' x2='{x:.0f}' y2='{y:.0f}' stroke='#e7edf6' stroke-width='1.5'/>")
         circles.append(f"<g><title>{esc(p.get('text',''))}</title>"
                        f"<circle cx='{x:.0f}' cy='{y:.0f}' r='20' fill='{f}' stroke='{s}' stroke-width='2'/>"
                        f"<text x='{x:.0f}' y='{y+3:.0f}' text-anchor='middle' font-size='9' font-weight='700' fill='{s}'>{esc(short(p))}</text></g>")
-    center = (f"<circle cx='{cx}' cy='{cy}' r='32' fill='#1c2340'/>"
+    center = (f"<circle cx='{cx}' cy='{cy}' r='32' fill='#1f6feb'/>"
               f"<text x='{cx}' y='{cy+4}' text-anchor='middle' font-size='11' font-weight='800' fill='#fff'>PATIENT</text>")
     pruned = sum(1 for p in corpus.passages if p["type"] == "distractor")
     return f"""<style>body{{margin:0;font-family:system-ui,-apple-system,sans-serif}}
       .h{{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}}
-      .h b{{color:#1c2340;font-size:14px}} .h span{{font-size:10.5px;font-weight:600;color:#8a93ad;text-transform:uppercase;letter-spacing:.06em}}
-      .lg{{display:flex;gap:14px;justify-content:center;margin-top:2px;font-size:11.5px;color:#495276}}
+      .h b{{color:#172033;font-size:14px}} .h span{{font-size:10.5px;font-weight:600;color:#98a2b3;text-transform:uppercase;letter-spacing:.06em}}
+      .lg{{display:flex;gap:14px;justify-content:center;margin-top:2px;font-size:11.5px;color:#637084}}
       .lg i{{display:inline-block;width:9px;height:9px;border-radius:9999px;margin-right:5px}}</style>
       <div class='h'><b>🧠 Clinical context graph</b><span>{len(nodes)} chunks retrieved · {pruned} pruned</span></div>
       <svg viewBox='0 0 {W} {Hh}' width='100%' style='display:block'>{''.join(edges)}{center}{''.join(circles)}</svg>
-      <div class='lg'><span><i style='background:#f43f5e'></i>Danger sign</span><span><i style='background:#4f7cff'></i>Medication</span><span><i style='background:#22c55e'></i>Lifestyle</span></div>"""
+      <div class='lg'><span><i style='background:#f04438'></i>Danger sign</span><span><i style='background:#1f6feb'></i>Medication</span><span><i style='background:#7c5cfc'></i>Lifestyle</span></div>"""
 
 
 def grounded_answer(query, corpus):
@@ -139,4 +139,4 @@ def grounded_answer(query, corpus):
     if not hits:
         return "I can only answer from the grounded guideline context and found no relevant passage. Please rephrase, or defer to the care team."
     body = " ".join(f"{h['text']} <span class='gr-cite'>{h['id']}</span>" for h in hits)
-    return f"Based on the grounded guidelines: {body} <br><span style='color:#8a93ad'>Assistive — always defer to the care team.</span>"
+    return f"Based on the grounded guidelines: {body} <br><span style='color:#98a2b3'>Assistive — always defer to the care team.</span>"

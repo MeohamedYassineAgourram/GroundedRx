@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 
 
@@ -132,7 +133,7 @@ class MockClient:
 # Real client -- OpenAI-compatible /v1/chat/completions (Ollama or vLLM).
 # ---------------------------------------------------------------------------
 class OpenAIClient:
-    def __init__(self, base_url, model, schema=None, timeout=120):
+    def __init__(self, base_url, model, schema=None, timeout=120, api_key=None, extra_headers=None):
         import requests  # local import so --mock has zero deps
 
         self._requests = requests
@@ -140,6 +141,17 @@ class OpenAIClient:
         self.model = model
         self.schema = schema
         self.timeout = timeout
+        # API key for cloud providers (OpenRouter / Google AI Studio / Together / Groq / ...).
+        # Local Ollama needs none. Falls back to env vars so keys never live in code.
+        self.api_key = api_key or os.getenv("GROUNDEDRX_API_KEY") or os.getenv("OPENAI_API_KEY")
+        self.extra_headers = extra_headers or {}
+
+    def _headers(self):
+        h = {"Content-Type": "application/json"}
+        if self.api_key:
+            h["Authorization"] = f"Bearer {self.api_key}"
+        h.update(self.extra_headers)
+        return h
 
     def _chat(self, system_prompt, user_prompt, response_format=None, max_tokens=1024):
         payload = {
@@ -155,7 +167,7 @@ class OpenAIClient:
             # Ollama accepts a JSON schema here; vLLM uses guided_json (see below).
             payload["response_format"] = response_format
         r = self._requests.post(
-            f"{self.base_url}/chat/completions", json=payload, timeout=self.timeout
+            f"{self.base_url}/chat/completions", json=payload, headers=self._headers(), timeout=self.timeout
         )
         r.raise_for_status()
         return r.json()["choices"][0]["message"]["content"]
@@ -224,9 +236,10 @@ def _coerce_plan(obj):
     }
 
 
-def make_client(mock, base_url=None, model=None, schema=None):
+def make_client(mock, base_url=None, model=None, schema=None, api_key=None, extra_headers=None):
     if mock:
         return MockClient()
     if not base_url or not model:
         raise ValueError("Real client requires --base-url and --model")
-    return OpenAIClient(base_url=base_url, model=model, schema=schema)
+    return OpenAIClient(base_url=base_url, model=model, schema=schema,
+                        api_key=api_key, extra_headers=extra_headers)

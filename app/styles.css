@@ -151,3 +151,68 @@ div[data-testid="stButton"] > button[kind="primary"] {
 [data-testid="stExpander"] summary { font-weight:600; color:var(--ink); }
 
 .gr-disclaimer { font-size:11px; color:var(--muted); margin-top:6px; line-height:1.5; }
+
+/* ============================ v3: profile-centric dynamic dashboard ============================ */
+
+/* avatars */
+.gr-av { border-radius:13px; display:inline-flex; align-items:center; justify-content:center; color:#fff;
+  font-weight:800; letter-spacing:-0.01em; flex:none; }
+.gr-av-lg { width:92px; height:92px; border-radius:20px; font-size:32px; }
+
+/* patient directory rows (name + date) -- native buttons carry the click */
+.gr-patrow { display:flex; align-items:center; gap:11px; }
+.gr-patrow .nm { font-weight:700; color:var(--ink); font-size:13.5px; line-height:1.15; }
+.gr-patrow .mt { font-size:11px; color:var(--muted); }
+div[data-testid="stButton"] > button p { margin:0; }
+
+/* profile hero */
+.gr-hero { display:flex; gap:20px; align-items:flex-start; }
+.gr-hero .name { font-size:23px; font-weight:800; color:var(--ink); letter-spacing:-0.02em; }
+.gr-hero .role { font-size:13px; color:var(--muted); margin-bottom:10px; }
+.gr-hero .blurb { font-size:13px; color:var(--body); line-height:1.6; margin-top:12px; max-width:52ch; }
+.gr-tags { display:flex; gap:7px; flex-wrap:wrap; margin-top:2px; }
+.gr-contact { display:flex; gap:8px; margin-top:14px; }
+.gr-icobtn { width:34px; height:34px; border-radius:10px; background:#f2f5ff; border:1px solid var(--border);
+  display:inline-flex; align-items:center; justify-content:center; color:#4f7cff; font-size:15px; }
+
+/* stat tiles with icon chip */
+.gr-stats { display:flex; gap:12px; flex-wrap:wrap; }
+.gr-stat { flex:1 1 0; min-width:120px; background:rgba(255,255,255,0.7); border:1px solid var(--border);
+  border-radius:16px; padding:13px 14px; display:flex; align-items:center; gap:12px; }
+.gr-stat .ico { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:17px; flex:none; }
+.gr-stat .val { font-size:19px; font-weight:800; color:var(--ink); line-height:1.1; }
+.gr-stat .cap { font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
+.ico-blue{ background:#e9f0ff; color:#3b6fe0; } .ico-rose{ background:#ffe9ee; color:#e11d48; }
+.ico-green{ background:#e6faf0; color:#059669; } .ico-violet{ background:#efe9fe; color:#7c5cf0; }
+.ico-amber{ background:#fff2e0; color:#ea8a1a; }
+
+/* mini calendar */
+.gr-cal { font-size:12px; }
+.gr-cal .cap { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.gr-cal .mo { font-weight:700; color:var(--ink); font-size:14px; }
+.gr-cal table { width:100%; border-collapse:collapse; }
+.gr-cal th { color:var(--muted); font-weight:600; font-size:10px; text-transform:uppercase; padding:5px 0; }
+.gr-cal td { text-align:center; padding:5px 0; color:var(--body); font-size:12px; border-radius:9px; }
+.gr-cal td.hl { background:linear-gradient(135deg,#5a86ff,#7c6cf0); color:#fff; font-weight:700; }
+.gr-cal td.dim { color:#c3c9db; }
+
+/* plan section list items (like the reference's right-side list) */
+.gr-item { display:flex; align-items:center; gap:13px; padding:12px 14px; border:1px solid var(--border);
+  border-radius:16px; margin-bottom:10px; background:rgba(255,255,255,0.7); transition:all .15s; }
+.gr-item:hover { border-color:#c7dbff; box-shadow:0 10px 22px -14px rgba(79,124,255,.5); }
+.gr-item .ico { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; flex:none; }
+.gr-item .ti { font-weight:700; color:var(--ink); font-size:13.5px; }
+.gr-item .su { font-size:12px; color:var(--muted); line-height:1.45; }
+
+/* copilot: suggested chips + avatar row */
+.gr-botrow { display:flex; gap:9px; align-items:flex-start; margin-bottom:9px; }
+.gr-botav { width:28px; height:28px; border-radius:9px; background:linear-gradient(135deg,#6a8cff,#8b6cf0);
+  color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; flex:none; }
+
+/* evidence bottom band */
+.gr-evhead { font-size:16px; font-weight:800; color:var(--ink); letter-spacing:-0.01em; }
+table.abl { width:100%; border-collapse:collapse; font-size:12px; }
+table.abl th { text-align:left; color:var(--muted); text-transform:uppercase; font-size:9.5px; letter-spacing:.05em; padding:7px 8px; border-bottom:1px solid var(--border); }
+table.abl td { padding:8px; border-bottom:1px solid rgba(238,242,248,0.8); color:var(--body); }
+table.abl td.g { color:#059669; font-weight:700; } table.abl td.r { color:#e11d48; font-weight:700; }
+table.abl tr:last-child td { border-bottom:none; font-weight:600; }

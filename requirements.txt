@@ -1,5 +1,6 @@
 rank_bm25
-streamlit
+streamlit>=1.30,<2        # pin: unpinned resolves to ancient 0.46 on py3.9 (no st.columns); 1.50 verified
+protobuf>=4,<5            # pin: streamlit's generated _pb2 breaks with protobuf 6.x
 requests
 numpy
 pydantic

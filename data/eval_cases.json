@@ -1,54 +1,785 @@
 {
-  "_note": "SYNTHETIC evaluation cases WITH ground truth. required_danger_ids -> recall target (100%). allowed_med_drugs -> any other med mentioned = hallucination. forbidden_terms -> injected traps that must NOT appear. Phase 2 expands this to 30 cases (6 profiles x 5 med combos, hand-hardened traps).",
-  "required_danger_ids_all": ["HF-DS-01", "HF-DS-02", "HF-DS-03", "HF-DS-04", "HF-DS-05", "HF-DS-06"],
+  "_note": "SYNTHETIC evaluation cases WITH ground truth. required_danger_ids -> recall target (100%). allowed_med_drugs -> any other med mentioned = hallucination. forbidden_terms -> injected traps that must NOT appear (each is a real distractor drug in the corpus, so it is a tempting-but-wrong retrieval).",
+  "required_danger_ids_all": [
+    "HF-DS-01",
+    "HF-DS-02",
+    "HF-DS-03",
+    "HF-DS-04",
+    "HF-DS-05",
+    "HF-DS-06"
+  ],
   "cases": [
     {
       "id": "HF-01",
       "profile": "72-year-old, new HFrEF, lives alone.",
-      "meds": ["furosemide", "lisinopril"],
-      "required_danger_ids": ["HF-DS-01", "HF-DS-02", "HF-DS-03", "HF-DS-04", "HF-DS-05", "HF-DS-06"],
-      "allowed_med_drugs": ["furosemide", "lisinopril"],
-      "forbidden_terms": ["warfarin"]
+      "meds": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "forbidden_terms": [
+        "ibuprofen",
+        "digoxin",
+        "warfarin"
+      ]
     },
     {
       "id": "HF-02",
-      "profile": "65-year-old, HFrEF with diabetes, on quadruple therapy.",
-      "meds": ["furosemide", "lisinopril", "carvedilol", "dapagliflozin"],
-      "required_danger_ids": ["HF-DS-01", "HF-DS-02", "HF-DS-03", "HF-DS-04", "HF-DS-05", "HF-DS-06"],
-      "allowed_med_drugs": ["furosemide", "lisinopril", "carvedilol", "dapagliflozin"],
-      "forbidden_terms": ["metformin", "ibuprofen"]
+      "profile": "72-year-old, new HFrEF, lives alone.",
+      "meds": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "digoxin",
+        "metformin"
+      ]
     },
     {
       "id": "HF-03",
-      "profile": "80-year-old, HFrEF, recent hospitalization for fluid overload.",
-      "meds": ["furosemide", "spironolactone"],
-      "required_danger_ids": ["HF-DS-01", "HF-DS-02", "HF-DS-03", "HF-DS-04", "HF-DS-05", "HF-DS-06"],
-      "allowed_med_drugs": ["furosemide", "spironolactone"],
-      "forbidden_terms": ["warfarin", "ibuprofen"]
+      "profile": "72-year-old, new HFrEF, lives alone.",
+      "meds": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "forbidden_terms": [
+        "metformin",
+        "atorvastatin"
+      ]
     },
     {
       "id": "HF-04",
-      "profile": "58-year-old, HFrEF, hypertension, active worker.",
-      "meds": ["lisinopril", "carvedilol"],
-      "required_danger_ids": ["HF-DS-01", "HF-DS-02", "HF-DS-03", "HF-DS-04", "HF-DS-05", "HF-DS-06"],
-      "allowed_med_drugs": ["lisinopril", "carvedilol"],
-      "forbidden_terms": ["warfarin"]
+      "profile": "72-year-old, new HFrEF, lives alone.",
+      "meds": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "forbidden_terms": [
+        "atorvastatin",
+        "naproxen"
+      ]
     },
     {
       "id": "HF-05",
-      "profile": "70-year-old, HFrEF, chronic kidney disease.",
-      "meds": ["furosemide", "carvedilol", "dapagliflozin"],
-      "required_danger_ids": ["HF-DS-01", "HF-DS-02", "HF-DS-03", "HF-DS-04", "HF-DS-05", "HF-DS-06"],
-      "allowed_med_drugs": ["furosemide", "carvedilol", "dapagliflozin"],
-      "forbidden_terms": ["warfarin", "atorvastatin"]
+      "profile": "72-year-old, new HFrEF, lives alone.",
+      "meds": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "naproxen",
+        "aspirin"
+      ]
     },
     {
       "id": "HF-06",
-      "profile": "68-year-old, HFrEF, atrial fibrillation history.",
-      "meds": ["furosemide", "lisinopril", "spironolactone"],
-      "required_danger_ids": ["HF-DS-01", "HF-DS-02", "HF-DS-03", "HF-DS-04", "HF-DS-05", "HF-DS-06"],
-      "allowed_med_drugs": ["furosemide", "lisinopril", "spironolactone"],
-      "forbidden_terms": ["warfarin", "digoxin"]
+      "profile": "65-year-old, HFrEF with type 2 diabetes.",
+      "meds": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "forbidden_terms": [
+        "aspirin",
+        "amlodipine"
+      ]
+    },
+    {
+      "id": "HF-07",
+      "profile": "65-year-old, HFrEF with type 2 diabetes.",
+      "meds": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "amlodipine",
+        "warfarin"
+      ]
+    },
+    {
+      "id": "HF-08",
+      "profile": "65-year-old, HFrEF with type 2 diabetes.",
+      "meds": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "forbidden_terms": [
+        "warfarin",
+        "ibuprofen",
+        "digoxin"
+      ]
+    },
+    {
+      "id": "HF-09",
+      "profile": "65-year-old, HFrEF with type 2 diabetes.",
+      "meds": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "forbidden_terms": [
+        "ibuprofen",
+        "digoxin"
+      ]
+    },
+    {
+      "id": "HF-10",
+      "profile": "65-year-old, HFrEF with type 2 diabetes.",
+      "meds": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "digoxin",
+        "metformin"
+      ]
+    },
+    {
+      "id": "HF-11",
+      "profile": "80-year-old, HFrEF, recent hospitalization for fluid overload.",
+      "meds": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "forbidden_terms": [
+        "metformin",
+        "atorvastatin"
+      ]
+    },
+    {
+      "id": "HF-12",
+      "profile": "80-year-old, HFrEF, recent hospitalization for fluid overload.",
+      "meds": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "atorvastatin",
+        "naproxen"
+      ]
+    },
+    {
+      "id": "HF-13",
+      "profile": "80-year-old, HFrEF, recent hospitalization for fluid overload.",
+      "meds": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "forbidden_terms": [
+        "naproxen",
+        "aspirin"
+      ]
+    },
+    {
+      "id": "HF-14",
+      "profile": "80-year-old, HFrEF, recent hospitalization for fluid overload.",
+      "meds": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "forbidden_terms": [
+        "aspirin",
+        "amlodipine"
+      ]
+    },
+    {
+      "id": "HF-15",
+      "profile": "80-year-old, HFrEF, recent hospitalization for fluid overload.",
+      "meds": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "amlodipine",
+        "warfarin",
+        "ibuprofen"
+      ]
+    },
+    {
+      "id": "HF-16",
+      "profile": "58-year-old, HFrEF and hypertension, still working.",
+      "meds": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "forbidden_terms": [
+        "warfarin",
+        "ibuprofen"
+      ]
+    },
+    {
+      "id": "HF-17",
+      "profile": "58-year-old, HFrEF and hypertension, still working.",
+      "meds": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "ibuprofen",
+        "digoxin"
+      ]
+    },
+    {
+      "id": "HF-18",
+      "profile": "58-year-old, HFrEF and hypertension, still working.",
+      "meds": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "forbidden_terms": [
+        "digoxin",
+        "metformin"
+      ]
+    },
+    {
+      "id": "HF-19",
+      "profile": "58-year-old, HFrEF and hypertension, still working.",
+      "meds": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "forbidden_terms": [
+        "metformin",
+        "atorvastatin"
+      ]
+    },
+    {
+      "id": "HF-20",
+      "profile": "58-year-old, HFrEF and hypertension, still working.",
+      "meds": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "atorvastatin",
+        "naproxen"
+      ]
+    },
+    {
+      "id": "HF-21",
+      "profile": "70-year-old, HFrEF with chronic kidney disease.",
+      "meds": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "forbidden_terms": [
+        "naproxen",
+        "aspirin"
+      ]
+    },
+    {
+      "id": "HF-22",
+      "profile": "70-year-old, HFrEF with chronic kidney disease.",
+      "meds": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "aspirin",
+        "amlodipine"
+      ]
+    },
+    {
+      "id": "HF-23",
+      "profile": "70-year-old, HFrEF with chronic kidney disease.",
+      "meds": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "forbidden_terms": [
+        "amlodipine",
+        "warfarin",
+        "naproxen"
+      ]
+    },
+    {
+      "id": "HF-24",
+      "profile": "70-year-old, HFrEF with chronic kidney disease.",
+      "meds": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "forbidden_terms": [
+        "warfarin",
+        "ibuprofen"
+      ]
+    },
+    {
+      "id": "HF-25",
+      "profile": "70-year-old, HFrEF with chronic kidney disease.",
+      "meds": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "ibuprofen",
+        "digoxin"
+      ]
+    },
+    {
+      "id": "HF-26",
+      "profile": "68-year-old, HFrEF with atrial fibrillation history.",
+      "meds": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril"
+      ],
+      "forbidden_terms": [
+        "digoxin",
+        "metformin"
+      ]
+    },
+    {
+      "id": "HF-27",
+      "profile": "68-year-old, HFrEF with atrial fibrillation history.",
+      "meds": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "carvedilol",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "metformin",
+        "atorvastatin"
+      ]
+    },
+    {
+      "id": "HF-28",
+      "profile": "68-year-old, HFrEF with atrial fibrillation history.",
+      "meds": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "spironolactone"
+      ],
+      "forbidden_terms": [
+        "atorvastatin",
+        "naproxen"
+      ]
+    },
+    {
+      "id": "HF-29",
+      "profile": "68-year-old, HFrEF with atrial fibrillation history.",
+      "meds": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "lisinopril",
+        "carvedilol"
+      ],
+      "forbidden_terms": [
+        "naproxen",
+        "aspirin"
+      ]
+    },
+    {
+      "id": "HF-30",
+      "profile": "68-year-old, HFrEF with atrial fibrillation history.",
+      "meds": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "required_danger_ids": [
+        "HF-DS-01",
+        "HF-DS-02",
+        "HF-DS-03",
+        "HF-DS-04",
+        "HF-DS-05",
+        "HF-DS-06"
+      ],
+      "allowed_med_drugs": [
+        "furosemide",
+        "lisinopril",
+        "carvedilol",
+        "spironolactone",
+        "dapagliflozin"
+      ],
+      "forbidden_terms": [
+        "aspirin",
+        "amlodipine"
+      ]
     }
   ]
 }

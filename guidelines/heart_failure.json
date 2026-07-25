@@ -1,38 +1,510 @@
 {
-  "_note": "ILLUSTRATIVE / SYNTHETIC content for demo & evaluation only. NOT clinical advice. Danger-sign, medication and lifestyle passages are simplified teaching text. Distractor passages are unrelated conditions/drugs used to pad the corpus so retrieval and the efficiency-frontier have something meaningful to prune. Phase 2 expands distractors to 40-80.",
+  "_note": "ILLUSTRATIVE / SYNTHETIC content for demo & evaluation only. NOT clinical advice. Danger-sign, medication and lifestyle passages are simplified teaching text. Distractor passages are real-drug facts for unrelated conditions, used to pad the corpus so retrieval and the efficiency-frontier have meaningful noise to prune.",
   "condition": "heart_failure",
   "passages": [
-    {"id": "HF-DS-01", "type": "danger_sign", "concept": "rapid weight gain", "text": "Weight gain of more than 2 kg (about 4-5 lb) in 2 to 3 days can signal fluid buildup in heart failure and needs urgent clinician contact."},
-    {"id": "HF-DS-02", "type": "danger_sign", "concept": "worsening breathlessness", "text": "New or worsening shortness of breath at rest, or waking at night gasping for air, is a heart-failure danger sign requiring urgent care."},
-    {"id": "HF-DS-03", "type": "danger_sign", "concept": "swelling edema", "text": "Increasing swelling of the ankles, legs, or abdomen indicates worsening fluid retention and should be reported promptly."},
-    {"id": "HF-DS-04", "type": "danger_sign", "concept": "chest pain", "text": "Chest pain or pressure, especially with sweating or nausea, may indicate a cardiac emergency; call emergency services immediately."},
-    {"id": "HF-DS-05", "type": "danger_sign", "concept": "lightheadedness fainting", "text": "Severe dizziness, lightheadedness, or fainting can reflect dangerously low blood pressure or an abnormal heart rhythm and needs urgent evaluation."},
-    {"id": "HF-DS-06", "type": "danger_sign", "concept": "confusion", "text": "New confusion, marked fatigue, or reduced alertness can be a sign of poor heart output and warrants urgent medical attention."},
-
-    {"id": "HF-MED-furosemide", "type": "medication", "drug": "furosemide", "text": "Furosemide is a loop diuretic used to remove excess fluid in heart failure. Take it in the morning to avoid nighttime urination; report muscle cramps or excessive thirst."},
-    {"id": "HF-MED-lisinopril", "type": "medication", "drug": "lisinopril", "text": "Lisinopril is an ACE inhibitor that lowers blood pressure and reduces strain on the heart. A dry cough or dizziness can occur; do not stop without advice."},
-    {"id": "HF-MED-carvedilol", "type": "medication", "drug": "carvedilol", "text": "Carvedilol is a beta-blocker that slows the heart and improves heart-failure survival. Take with food; do not stop suddenly as this can worsen symptoms."},
-    {"id": "HF-MED-spironolactone", "type": "medication", "drug": "spironolactone", "text": "Spironolactone is a potassium-sparing diuretic used in heart failure. Avoid potassium supplements and salt substitutes; report irregular heartbeat."},
-    {"id": "HF-MED-dapagliflozin", "type": "medication", "drug": "dapagliflozin", "text": "Dapagliflozin is an SGLT2 inhibitor shown to reduce heart-failure hospitalizations. Maintain hydration and report signs of urinary or genital infection."},
-
-    {"id": "HF-LIFE-01", "type": "lifestyle", "concept": "sodium restriction", "text": "Limiting dietary sodium (salt) helps prevent fluid buildup; aim for the intake target your care team specifies."},
-    {"id": "HF-LIFE-02", "type": "lifestyle", "concept": "daily weights", "text": "Weigh yourself each morning after using the bathroom and before breakfast, and record it to catch fluid gain early."},
-    {"id": "HF-LIFE-03", "type": "lifestyle", "concept": "fluid awareness", "text": "Follow any fluid-intake limit set by your care team, and space drinks through the day to manage thirst."},
-
-    {"id": "DIST-001", "type": "distractor", "concept": "asthma inhaler", "text": "Albuterol is a short-acting bronchodilator used to relieve acute asthma symptoms by relaxing airway muscles."},
-    {"id": "DIST-002", "type": "distractor", "concept": "diabetes metformin", "text": "Metformin is a first-line medication for type 2 diabetes that lowers glucose production by the liver; take with meals to reduce stomach upset."},
-    {"id": "DIST-003", "type": "distractor", "concept": "hypothyroid", "text": "Levothyroxine replaces thyroid hormone in hypothyroidism; take on an empty stomach and avoid calcium near the same time."},
-    {"id": "DIST-004", "type": "distractor", "concept": "anticoagulant warfarin", "text": "Warfarin is an anticoagulant requiring regular INR monitoring; many foods and drugs alter its effect."},
-    {"id": "DIST-005", "type": "distractor", "concept": "statin", "text": "Atorvastatin lowers LDL cholesterol; report unexplained muscle pain or weakness, which can rarely indicate muscle injury."},
-    {"id": "DIST-006", "type": "distractor", "concept": "ppi reflux", "text": "Omeprazole reduces stomach acid for reflux and ulcers; long-term use is reviewed periodically by your clinician."},
-    {"id": "DIST-007", "type": "distractor", "concept": "antibiotic", "text": "Amoxicillin is a penicillin-class antibiotic used for certain bacterial infections; complete the full course as prescribed."},
-    {"id": "DIST-008", "type": "distractor", "concept": "migraine", "text": "Sumatriptan is used to treat migraine attacks by narrowing blood vessels around the brain; it is not for prevention."},
-    {"id": "DIST-009", "type": "distractor", "concept": "copd", "text": "Tiotropium is a long-acting inhaled bronchodilator used for maintenance treatment of COPD."},
-    {"id": "DIST-010", "type": "distractor", "concept": "depression ssri", "text": "Sertraline is an SSRI antidepressant; effects may take several weeks and it should not be stopped abruptly."},
-    {"id": "DIST-011", "type": "distractor", "concept": "osteoporosis", "text": "Alendronate is a bisphosphonate for osteoporosis; take with water and remain upright for 30 minutes."},
-    {"id": "DIST-012", "type": "distractor", "concept": "gout", "text": "Allopurinol lowers uric acid to prevent gout attacks; drink adequate fluids and report any rash."},
-    {"id": "DIST-013", "type": "distractor", "concept": "epilepsy", "text": "Levetiracetam is an antiseizure medication; report mood changes and do not stop suddenly."},
-    {"id": "DIST-014", "type": "distractor", "concept": "allergy antihistamine", "text": "Cetirizine is a second-generation antihistamine for allergic rhinitis and hives, causing less drowsiness than older agents."},
-    {"id": "DIST-015", "type": "distractor", "concept": "pain nsaid", "text": "Ibuprofen is an NSAID for pain and inflammation; it can worsen fluid retention and kidney function and is often avoided in heart failure."}
+    {
+      "id": "HF-DS-01",
+      "type": "danger_sign",
+      "concept": "rapid weight gain",
+      "text": "Weight gain of more than 2 kg (about 4-5 lb) in 2 to 3 days can signal fluid buildup in heart failure and needs urgent clinician contact."
+    },
+    {
+      "id": "HF-DS-02",
+      "type": "danger_sign",
+      "concept": "worsening breathlessness",
+      "text": "New or worsening shortness of breath at rest, or waking at night gasping for air, is a heart-failure danger sign requiring urgent care."
+    },
+    {
+      "id": "HF-DS-03",
+      "type": "danger_sign",
+      "concept": "swelling edema",
+      "text": "Increasing swelling of the ankles, legs, or abdomen indicates worsening fluid retention and should be reported promptly."
+    },
+    {
+      "id": "HF-DS-04",
+      "type": "danger_sign",
+      "concept": "chest pain",
+      "text": "Chest pain or pressure, especially with sweating or nausea, may indicate a cardiac emergency; call emergency services immediately."
+    },
+    {
+      "id": "HF-DS-05",
+      "type": "danger_sign",
+      "concept": "lightheadedness fainting",
+      "text": "Severe dizziness, lightheadedness, or fainting can reflect dangerously low blood pressure or an abnormal heart rhythm and needs urgent evaluation."
+    },
+    {
+      "id": "HF-DS-06",
+      "type": "danger_sign",
+      "concept": "confusion",
+      "text": "New confusion, marked fatigue, or reduced alertness can be a sign of poor heart output and warrants urgent medical attention."
+    },
+    {
+      "id": "HF-MED-furosemide",
+      "type": "medication",
+      "drug": "furosemide",
+      "text": "Furosemide is a loop diuretic used to remove excess fluid in heart failure. Take it in the morning to avoid nighttime urination; report muscle cramps or excessive thirst."
+    },
+    {
+      "id": "HF-MED-lisinopril",
+      "type": "medication",
+      "drug": "lisinopril",
+      "text": "Lisinopril is an ACE inhibitor that lowers blood pressure and reduces strain on the heart. A dry cough or dizziness can occur; do not stop without advice."
+    },
+    {
+      "id": "HF-MED-carvedilol",
+      "type": "medication",
+      "drug": "carvedilol",
+      "text": "Carvedilol is a beta-blocker that slows the heart and improves heart-failure survival. Take with food; do not stop suddenly as this can worsen symptoms."
+    },
+    {
+      "id": "HF-MED-spironolactone",
+      "type": "medication",
+      "drug": "spironolactone",
+      "text": "Spironolactone is a potassium-sparing diuretic used in heart failure. Avoid potassium supplements and salt substitutes; report irregular heartbeat."
+    },
+    {
+      "id": "HF-MED-dapagliflozin",
+      "type": "medication",
+      "drug": "dapagliflozin",
+      "text": "Dapagliflozin is an SGLT2 inhibitor shown to reduce heart-failure hospitalizations. Maintain hydration and report signs of urinary or genital infection."
+    },
+    {
+      "id": "HF-LIFE-01",
+      "type": "lifestyle",
+      "concept": "sodium restriction",
+      "text": "Limiting dietary sodium (salt) helps prevent fluid buildup; aim for the intake target your care team specifies."
+    },
+    {
+      "id": "HF-LIFE-02",
+      "type": "lifestyle",
+      "concept": "daily weights",
+      "text": "Weigh yourself each morning after using the bathroom and before breakfast, and record it to catch fluid gain early."
+    },
+    {
+      "id": "HF-LIFE-03",
+      "type": "lifestyle",
+      "concept": "fluid awareness",
+      "text": "Follow any fluid-intake limit set by your care team, and space drinks through the day to manage thirst."
+    },
+    {
+      "id": "DIST-001",
+      "type": "distractor",
+      "concept": "asthma rescue inhaler",
+      "drug": "albuterol",
+      "text": "Albuterol is used for asthma rescue inhaler: relieves acute asthma symptoms by relaxing airway muscles; overuse can cause tremor or fast heartbeat."
+    },
+    {
+      "id": "DIST-002",
+      "type": "distractor",
+      "concept": "type 2 diabetes",
+      "drug": "metformin",
+      "text": "Metformin is used for type 2 diabetes: lowers glucose production by the liver; take with meals to reduce stomach upset."
+    },
+    {
+      "id": "DIST-003",
+      "type": "distractor",
+      "concept": "hypothyroidism",
+      "drug": "levothyroxine",
+      "text": "Levothyroxine is used for hypothyroidism: replaces thyroid hormone; take on an empty stomach and separate it from calcium and iron."
+    },
+    {
+      "id": "DIST-004",
+      "type": "distractor",
+      "concept": "anticoagulation",
+      "drug": "warfarin",
+      "text": "Warfarin is used for anticoagulation: an anticoagulant requiring regular INR monitoring; many foods and drugs alter its effect."
+    },
+    {
+      "id": "DIST-005",
+      "type": "distractor",
+      "concept": "high cholesterol",
+      "drug": "atorvastatin",
+      "text": "Atorvastatin is used for high cholesterol: lowers LDL cholesterol; report unexplained muscle pain or weakness."
+    },
+    {
+      "id": "DIST-006",
+      "type": "distractor",
+      "concept": "acid reflux",
+      "drug": "omeprazole",
+      "text": "Omeprazole is used for acid reflux: reduces stomach acid for reflux and ulcers; long-term use is reviewed periodically."
+    },
+    {
+      "id": "DIST-007",
+      "type": "distractor",
+      "concept": "bacterial infection",
+      "drug": "amoxicillin",
+      "text": "Amoxicillin is used for bacterial infection: a penicillin-class antibiotic; complete the full prescribed course."
+    },
+    {
+      "id": "DIST-008",
+      "type": "distractor",
+      "concept": "migraine",
+      "drug": "sumatriptan",
+      "text": "Sumatriptan is used for migraine: treats migraine attacks by narrowing blood vessels around the brain; not for prevention."
+    },
+    {
+      "id": "DIST-009",
+      "type": "distractor",
+      "concept": "COPD maintenance",
+      "drug": "tiotropium",
+      "text": "Tiotropium is used for COPD maintenance: a long-acting inhaled bronchodilator for maintenance treatment of COPD."
+    },
+    {
+      "id": "DIST-010",
+      "type": "distractor",
+      "concept": "depression",
+      "drug": "sertraline",
+      "text": "Sertraline is used for depression: an SSRI antidepressant; effects take several weeks and it should not be stopped abruptly."
+    },
+    {
+      "id": "DIST-011",
+      "type": "distractor",
+      "concept": "osteoporosis",
+      "drug": "alendronate",
+      "text": "Alendronate is used for osteoporosis: a bisphosphonate; take with water and remain upright for 30 minutes."
+    },
+    {
+      "id": "DIST-012",
+      "type": "distractor",
+      "concept": "gout prevention",
+      "drug": "allopurinol",
+      "text": "Allopurinol is used for gout prevention: lowers uric acid to prevent gout attacks; drink adequate fluids and report any rash."
+    },
+    {
+      "id": "DIST-013",
+      "type": "distractor",
+      "concept": "epilepsy",
+      "drug": "levetiracetam",
+      "text": "Levetiracetam is used for epilepsy: an antiseizure medication; report mood changes and do not stop suddenly."
+    },
+    {
+      "id": "DIST-014",
+      "type": "distractor",
+      "concept": "allergic rhinitis",
+      "drug": "cetirizine",
+      "text": "Cetirizine is used for allergic rhinitis: a second-generation antihistamine causing less drowsiness than older agents."
+    },
+    {
+      "id": "DIST-015",
+      "type": "distractor",
+      "concept": "pain and inflammation",
+      "drug": "ibuprofen",
+      "text": "Ibuprofen is used for pain and inflammation: an NSAID that can worsen fluid retention and kidney function and is often avoided in heart failure."
+    },
+    {
+      "id": "DIST-016",
+      "type": "distractor",
+      "concept": "nerve pain",
+      "drug": "gabapentin",
+      "text": "Gabapentin is used for nerve pain: used for neuropathic pain and some seizures; may cause drowsiness and dizziness."
+    },
+    {
+      "id": "DIST-017",
+      "type": "distractor",
+      "concept": "hypertension",
+      "drug": "amlodipine",
+      "text": "Amlodipine is used for hypertension: a calcium-channel blocker for blood pressure; ankle swelling is a common side effect."
+    },
+    {
+      "id": "DIST-018",
+      "type": "distractor",
+      "concept": "hypertension",
+      "drug": "hydrochlorothiazide",
+      "text": "Hydrochlorothiazide is used for hypertension: a thiazide diuretic for blood pressure; can lower potassium and raise blood sugar."
+    },
+    {
+      "id": "DIST-019",
+      "type": "distractor",
+      "concept": "inflammation",
+      "drug": "prednisone",
+      "text": "Prednisone is used for inflammation: a corticosteroid; do not stop abruptly and watch for raised blood sugar and mood changes."
+    },
+    {
+      "id": "DIST-020",
+      "type": "distractor",
+      "concept": "diabetes",
+      "drug": "insulin glargine",
+      "text": "Insulin glargine is used for diabetes: a long-acting basal insulin; rotate injection sites and watch for low blood sugar."
+    },
+    {
+      "id": "DIST-021",
+      "type": "distractor",
+      "concept": "asthma/allergy",
+      "drug": "montelukast",
+      "text": "Montelukast is used for asthma/allergy: a leukotriene modifier taken in the evening for asthma and allergic rhinitis."
+    },
+    {
+      "id": "DIST-022",
+      "type": "distractor",
+      "concept": "antiplatelet",
+      "drug": "clopidogrel",
+      "text": "Clopidogrel is used for antiplatelet: reduces clot risk after stents; report unusual bruising or bleeding."
+    },
+    {
+      "id": "DIST-023",
+      "type": "distractor",
+      "concept": "anticoagulation",
+      "drug": "apixaban",
+      "text": "Apixaban is used for anticoagulation: a direct oral anticoagulant; do not miss doses and report bleeding."
+    },
+    {
+      "id": "DIST-024",
+      "type": "distractor",
+      "concept": "rate control",
+      "drug": "digoxin",
+      "text": "Digoxin is used for rate control: narrow therapeutic range; report nausea, visual changes, or slow heartbeat."
+    },
+    {
+      "id": "DIST-025",
+      "type": "distractor",
+      "concept": "enlarged prostate",
+      "drug": "tamsulosin",
+      "text": "Tamsulosin is used for enlarged prostate: relaxes bladder-neck muscles; may cause dizziness when standing."
+    },
+    {
+      "id": "DIST-026",
+      "type": "distractor",
+      "concept": "enlarged prostate",
+      "drug": "finasteride",
+      "text": "Finasteride is used for enlarged prostate: shrinks the prostate over months; handle with care in pregnancy."
+    },
+    {
+      "id": "DIST-027",
+      "type": "distractor",
+      "concept": "anxiety",
+      "drug": "escitalopram",
+      "text": "Escitalopram is used for anxiety: an SSRI for anxiety and depression; taper rather than stopping suddenly."
+    },
+    {
+      "id": "DIST-028",
+      "type": "distractor",
+      "concept": "reflux",
+      "drug": "pantoprazole",
+      "text": "Pantoprazole is used for reflux: a proton-pump inhibitor for reflux and ulcers."
+    },
+    {
+      "id": "DIST-029",
+      "type": "distractor",
+      "concept": "respiratory infection",
+      "drug": "azithromycin",
+      "text": "Azithromycin is used for respiratory infection: a macrolide antibiotic; can affect heart rhythm in susceptible people."
+    },
+    {
+      "id": "DIST-030",
+      "type": "distractor",
+      "concept": "urinary infection",
+      "drug": "ciprofloxacin",
+      "text": "Ciprofloxacin is used for urinary infection: a fluoroquinolone antibiotic; report tendon pain and avoid with dairy at dosing."
+    },
+    {
+      "id": "DIST-031",
+      "type": "distractor",
+      "concept": "anticoagulation",
+      "drug": "warfarin sodium",
+      "text": "Warfarin sodium is used for anticoagulation: same active drug as warfarin; keep vitamin-K intake steady."
+    },
+    {
+      "id": "DIST-032",
+      "type": "distractor",
+      "concept": "rheumatoid arthritis",
+      "drug": "methotrexate",
+      "text": "Methotrexate is used for rheumatoid arthritis: a weekly disease-modifying drug; NEVER take daily; take folic acid as directed."
+    },
+    {
+      "id": "DIST-033",
+      "type": "distractor",
+      "concept": "lupus/RA",
+      "drug": "hydroxychloroquine",
+      "text": "Hydroxychloroquine is used for lupus/RA: used for autoimmune disease; eye checks are recommended periodically."
+    },
+    {
+      "id": "DIST-034",
+      "type": "distractor",
+      "concept": "asthma",
+      "drug": "salbutamol",
+      "text": "Salbutamol is used for asthma: another name for albuterol; a short-acting reliever inhaler."
+    },
+    {
+      "id": "DIST-035",
+      "type": "distractor",
+      "concept": "asthma maintenance",
+      "drug": "budesonide",
+      "text": "Budesonide is used for asthma maintenance: an inhaled corticosteroid; rinse the mouth after use to prevent thrush."
+    },
+    {
+      "id": "DIST-036",
+      "type": "distractor",
+      "concept": "anticoagulation",
+      "drug": "rivaroxaban",
+      "text": "Rivaroxaban is used for anticoagulation: a direct oral anticoagulant taken with food; report bleeding."
+    },
+    {
+      "id": "DIST-037",
+      "type": "distractor",
+      "concept": "diabetes",
+      "drug": "empagliflozin",
+      "text": "Empagliflozin is used for diabetes: an SGLT2 inhibitor for diabetes; maintain hydration and genital hygiene."
+    },
+    {
+      "id": "DIST-038",
+      "type": "distractor",
+      "concept": "type 2 diabetes",
+      "drug": "glipizide",
+      "text": "Glipizide is used for type 2 diabetes: a sulfonylurea that can cause low blood sugar; take before meals."
+    },
+    {
+      "id": "DIST-039",
+      "type": "distractor",
+      "concept": "hypertension",
+      "drug": "losartan",
+      "text": "Losartan is used for hypertension: an ARB for blood pressure; monitor potassium and kidney function."
+    },
+    {
+      "id": "DIST-040",
+      "type": "distractor",
+      "concept": "tremor/migraine",
+      "drug": "propranolol",
+      "text": "Propranolol is used for tremor/migraine: a non-selective beta-blocker used for tremor and migraine prevention."
+    },
+    {
+      "id": "DIST-041",
+      "type": "distractor",
+      "concept": "angina",
+      "drug": "nitroglycerin",
+      "text": "Nitroglycerin is used for angina: relieves chest pain from angina; sit down when using and seek help if pain persists."
+    },
+    {
+      "id": "DIST-042",
+      "type": "distractor",
+      "concept": "antiplatelet",
+      "drug": "aspirin",
+      "text": "Aspirin is used for antiplatelet: low-dose aspirin reduces clot risk; report black stools or easy bruising."
+    },
+    {
+      "id": "DIST-043",
+      "type": "distractor",
+      "concept": "cough/pain",
+      "drug": "codeine",
+      "text": "Codeine is used for cough/pain: an opioid for pain or cough; can cause drowsiness and constipation."
+    },
+    {
+      "id": "DIST-044",
+      "type": "distractor",
+      "concept": "anxiety/spasm",
+      "drug": "diazepam",
+      "text": "Diazepam is used for anxiety/spasm: a benzodiazepine; causes drowsiness and can be habit-forming."
+    },
+    {
+      "id": "DIST-045",
+      "type": "distractor",
+      "concept": "allergic rhinitis",
+      "drug": "fluticasone",
+      "text": "Fluticasone is used for allergic rhinitis: a steroid nasal spray; use daily for best allergy control."
+    },
+    {
+      "id": "DIST-046",
+      "type": "distractor",
+      "concept": "reflux",
+      "drug": "ranitidine",
+      "text": "Ranitidine is used for reflux: an H2 blocker historically used for reflux and ulcers."
+    },
+    {
+      "id": "DIST-047",
+      "type": "distractor",
+      "concept": "high cholesterol",
+      "drug": "simvastatin",
+      "text": "Simvastatin is used for high cholesterol: a statin; certain doses interact with other drugs, so follow labeling."
+    },
+    {
+      "id": "DIST-048",
+      "type": "distractor",
+      "concept": "clot prevention",
+      "drug": "enoxaparin",
+      "text": "Enoxaparin is used for clot prevention: an injectable low-molecular-weight heparin; rotate injection sites."
+    },
+    {
+      "id": "DIST-049",
+      "type": "distractor",
+      "concept": "epilepsy",
+      "drug": "carbamazepine",
+      "text": "Carbamazepine is used for epilepsy: an antiseizure drug with many interactions; report rash promptly."
+    },
+    {
+      "id": "DIST-050",
+      "type": "distractor",
+      "concept": "depression",
+      "drug": "venlafaxine",
+      "text": "Venlafaxine is used for depression: an SNRI; taper slowly to avoid discontinuation symptoms."
+    },
+    {
+      "id": "DIST-051",
+      "type": "distractor",
+      "concept": "psychiatric",
+      "drug": "olanzapine",
+      "text": "Olanzapine is used for psychiatric: an antipsychotic that can raise blood sugar and weight."
+    },
+    {
+      "id": "DIST-052",
+      "type": "distractor",
+      "concept": "depression",
+      "drug": "mirtazapine",
+      "text": "Mirtazapine is used for depression: an antidepressant that can increase appetite and cause drowsiness."
+    },
+    {
+      "id": "DIST-053",
+      "type": "distractor",
+      "concept": "anticoagulation",
+      "drug": "dabigatran",
+      "text": "Dabigatran is used for anticoagulation: a direct oral anticoagulant; keep in original packaging for stability."
+    },
+    {
+      "id": "DIST-054",
+      "type": "distractor",
+      "concept": "gout",
+      "drug": "febuxostat",
+      "text": "Febuxostat is used for gout: lowers uric acid as an alternative to allopurinol."
+    },
+    {
+      "id": "DIST-055",
+      "type": "distractor",
+      "concept": "gout flare",
+      "drug": "colchicine",
+      "text": "Colchicine is used for gout flare: eases acute gout; diarrhea is a common dose-limiting effect."
+    },
+    {
+      "id": "DIST-056",
+      "type": "distractor",
+      "concept": "pain",
+      "drug": "naproxen",
+      "text": "Naproxen is used for pain: an NSAID like ibuprofen; can worsen fluid retention and is often avoided in heart failure."
+    },
+    {
+      "id": "DIST-057",
+      "type": "distractor",
+      "concept": "inflammation",
+      "drug": "dexamethasone",
+      "text": "Dexamethasone is used for inflammation: a potent corticosteroid; monitor blood sugar and mood."
+    },
+    {
+      "id": "DIST-058",
+      "type": "distractor",
+      "concept": "loop diuretic solution",
+      "drug": "furosemide 10mg/ml",
+      "text": "Furosemide 10mg/ml is used for loop diuretic solution: a liquid formulation for people who cannot swallow tablets."
+    },
+    {
+      "id": "DIST-059",
+      "type": "distractor",
+      "concept": "pain/fever",
+      "drug": "acetaminophen",
+      "text": "Acetaminophen is used for pain/fever: paracetamol for pain and fever; stay within the daily maximum to protect the liver."
+    },
+    {
+      "id": "DIST-060",
+      "type": "distractor",
+      "concept": "infection",
+      "drug": "doxycycline",
+      "text": "Doxycycline is used for infection: a tetracycline antibiotic; avoid lying down right after dosing."
+    }
   ]
 }

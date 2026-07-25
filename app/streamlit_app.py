@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # app/ dir for ui_helpers
 from ui_helpers import C_BLUE, C_ENG, C_NAIVE, C_VIOLET, esc, grounded_answer, identity, patient_workspace
-from eval.metrics import citation_faithfulness, danger_recall, has_hallucination
+from eval.metrics import citation_faithfulness, danger_recall, has_hallucination, score_run
 from src import pipeline
 from src.model_client import make_client
 from src.prompts import PLAN_SCHEMA, validate_plan
@@ -206,6 +206,38 @@ def latest_real_evidence():
     return None
 
 
+@st.cache_data(show_spinner=False)
+def precomputed_evidence():
+    """Full precomputed ablation from the deterministic offline harness.
+
+    Reproducible with `python eval/run_eval.py --mock`. Shaped exactly like a recorded
+    artifact so the same renderer draws a fully-populated dashboard for the demo, clearly
+    labelled as the reproducible harness (not live-model output).
+    """
+    corpus, cases = load_data()
+    client = make_client(True, schema=PLAN_SCHEMA)
+    case_ids = [c["id"] for c in cases]
+
+    def rows(configs):
+        out = []
+        for name, cfg in configs:
+            results = [pipeline.run_case(c, corpus, client, cfg) for c in cases]
+            out.append({"name": name, "aggregate": score_run(results, cases, corpus), "cases": case_ids})
+        return out
+
+    return {
+        "mode": "precomputed",
+        "experiment": "precomputed_ablation",
+        "evidence_status": "PRECOMPUTED_HARNESS",
+        "client": {"model": "GroundedRx offline harness (reproducible with --mock)"},
+        "inputs": {"cases": len(cases), "corpus_passages": len(corpus.passages)},
+        "additive": rows(list(pipeline.additive_configs())),
+        "leave_one_out": rows(list(pipeline.loo_configs())),
+        "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "_path": "precomputed offline harness — reproducible via `eval/run_eval.py --mock`",
+    }
+
+
 def artifact_rows(records):
     rows = []
     for item in records or []:
@@ -265,13 +297,24 @@ def render_evidence_page(artifact):
                 f"<div class='gr-evidence-kpi-label'>{label}</div>"
                 f"<div class='gr-evidence-kpi-detail'>{detail}</div></div></article>")
 
+    is_precomputed = artifact.get("experiment") == "precomputed_ablation"
+    if is_precomputed:
+        eyebrow = "Reproducible ablation harness"
+        copy = ("This dashboard is the deterministic offline harness — reproducible with "
+                "<code>eval/run_eval.py --mock</code>. It compares the same synthetic cases across "
+                "controlled context-management configurations to show what each layer is worth.")
+        badge = f"<span class='gr-live'></span>Offline harness · n={artifact.get('inputs', {}).get('cases', sample_size)}"
+    else:
+        eyebrow = "Recorded model experiment"
+        copy = ("This view is populated only from a saved real-model run. It compares "
+                "the same synthetic cases across controlled context-management configurations.")
+        badge = f"<span class='gr-live'></span>{esc(client.get('model', 'Recorded model'))} · n={sample_size}"
     st.markdown(
         "<section class='gr-evidence-hero'>"
-        "<div><div class='gr-evidence-eyebrow'>Recorded model experiment</div>"
+        f"<div><div class='gr-evidence-eyebrow'>{eyebrow}</div>"
         "<div class='gr-evidence-title'>Evidence, with its provenance attached.</div>"
-        "<div class='gr-evidence-copy'>This view is populated only from a saved real-model run. It compares "
-        "the same synthetic cases across controlled context-management configurations.</div></div>"
-        f"<div class='gr-evidence-hero-badge'><span class='gr-live'></span>{esc(client.get('model', 'Recorded model'))} · n={sample_size}</div>"
+        f"<div class='gr-evidence-copy'>{copy}</div></div>"
+        f"<div class='gr-evidence-hero-badge'>{badge}</div>"
         "</section>",
         unsafe_allow_html=True,
     )
@@ -442,7 +485,9 @@ with st.container(border=True, key="top_navigation"):
         )
 
 if st.session_state.view == "evidence":
-    render_evidence_page(latest_real_evidence())
+    # Demo-ready: render the full precomputed ablation (reproducible with --mock) so the
+    # dashboard is always fully populated. A single-patient real run does not fill the charts.
+    render_evidence_page(precomputed_evidence())
     st.markdown("<div class='gr-disclaimer gr-page-disclaimer'>⚠️ Synthetic benchmark and demo identities only — "
                 "not clinical validation or medical advice. Real-run charts are reproducibility evidence for "
                 "context management, not proof of clinical safety. Danger-sign passages are policy-pinned.</div>",

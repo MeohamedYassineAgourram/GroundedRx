@@ -1,0 +1,8 @@
+rank_bm25
+streamlit
+requests
+numpy
+pydantic
+matplotlib
+# sentence-transformers   # optional: embedding retrieval, not needed for BM25 path
+# vllm                    # NOT used: requires CUDA/NVIDIA. This box is Apple Silicon -> Ollama only.

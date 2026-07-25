@@ -1,4 +1,4 @@
-"""Prompt builders (baseline vs engineered) + the locked JSON schema + verify prompt.
+"""Prompt builders (baseline vs engineered) + the locked JSON schema.
 
 Layers touched here:
   - Layer 3 (locked schema): PLAN_SCHEMA, enforced via guided/structured decoding.
@@ -66,7 +66,7 @@ ENGINEERED_SYSTEM = (
 
 
 def build_system(cfg):
-    return ENGINEERED_SYSTEM if (cfg.schema or cfg.retrieval or cfg.verify) else BASELINE_SYSTEM
+    return ENGINEERED_SYSTEM if (cfg.schema or cfg.retrieval or cfg.reground) else BASELINE_SYSTEM
 
 
 def _order_for_robustness(pairs, enabled):
@@ -121,12 +121,6 @@ def build_user(case, context_block, fewshot_block, cfg):
     else:
         parts.append("Write the aftercare plan.")
     return "\n".join(parts)
-
-
-VERIFY_SYSTEM = (
-    "You are a strict fact-checker. Given a claim and its cited passage, answer with exactly "
-    "one word: SUPPORTED or UNSUPPORTED."
-)
 
 
 def validate_plan(plan):

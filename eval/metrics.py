@@ -14,8 +14,16 @@ from __future__ import annotations
 import re
 
 
+# Generic instruction words carry no grounding signal (see reground._STOP): a claim that only
+# shares "take/daily" with a passage is not faithful to it. Keying on distinctive terms keeps a
+# mis-cited drug from being scored as faithful.
+_STOP = {"take", "taken", "daily", "morning", "night", "report", "avoid", "prescribed", "care",
+         "team", "continue", "before", "after", "dose", "times", "your", "with", "food", "when",
+         "this", "that", "from", "into", "each", "used", "using", "help", "keep", "make", "over"}
+
+
 def _tok(text):
-    return {w for w in re.findall(r"[a-z0-9]+", str(text).lower()) if len(w) > 3}
+    return {w for w in re.findall(r"[a-z0-9]+", str(text).lower()) if len(w) > 3 and w not in _STOP}
 
 
 def _best_danger_id(claim_text, corpus, threshold=0.34):

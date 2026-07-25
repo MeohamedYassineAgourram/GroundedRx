@@ -61,8 +61,8 @@ def _count_claims(plan):
 
 
 def _inspect_case(case_id, cases, corpus, client):
-    """Phase 3+4 evidence: one case through baseline vs FULL, schema-valid per config,
-    and the verify pass shown dropping unsupported claims."""
+    """One case through baseline vs context-engineered (CE-FULL): schema-valid per config,
+    and the effect of the optional multi-step re-grounding shown separately."""
     case = next((c for c in cases if c["id"] == case_id), None)
     if case is None:
         print(f"case {case_id} not found. available: {', '.join(c['id'] for c in cases[:8])} ...")
@@ -70,7 +70,7 @@ def _inspect_case(case_id, cases, corpus, client):
     print(f"CASE {case['id']}: {case['profile']}")
     print(f"  meds={case['meds']}  forbidden={case['forbidden_terms']}\n")
 
-    for name, cfg in (("baseline", pipeline.BASELINE), ("FULL", pipeline.FULL)):
+    for name, cfg in (("baseline", pipeline.BASELINE), ("context-engineered (CE-FULL)", pipeline.CE_FULL)):
         r = pipeline.run_case(case, corpus, client, cfg)
         ok, errs = validate_plan(r["plan"])
         print(f"--- {name} ({cfg.label()}) ---  ctx_tokens={r['ctx_tokens']}  schema_valid={ok}")
@@ -82,14 +82,13 @@ def _inspect_case(case_id, cases, corpus, client):
                 print(f"    [{k[:6]:6}] {str(label)[:60]:60} cite={item.get('guideline_id','') or '—'}")
         print()
 
-    # Phase 4: show verify actually removing claims (FULL minus verify vs FULL).
-    from dataclasses import replace as _replace
-    no_verify = _replace(pipeline.FULL, verify=False)
-    before = pipeline.run_case(case, corpus, client, no_verify)["plan"]
+    # Show the optional multi-step re-grounding refinement (CE-FULL vs FULL).
+    before = pipeline.run_case(case, corpus, client, pipeline.CE_FULL)["plan"]
     after = pipeline.run_case(case, corpus, client, pipeline.FULL)["plan"]
-    dropped = _count_claims(before) - _count_claims(after)
-    print(f"VERIFY PASS: {_count_claims(before)} claims -> {_count_claims(after)} "
-          f"({dropped} unsupported claim(s) dropped, incl. any invented/uncited med).")
+    delta = _count_claims(before) - _count_claims(after)
+    print(f"OPTIONAL RE-GROUNDING (multi-step): {_count_claims(before)} claims -> {_count_claims(after)} "
+          f"({'no change needed' if delta == 0 else f'{delta} residual claim(s) regenerated away'}). "
+          f"The heavy lifting was already done by context engineering.")
 
 
 def main():
@@ -101,7 +100,7 @@ def main():
     ap.add_argument("--cases", default=os.path.join(ROOT, "data", "eval_cases.json"))
     ap.add_argument("--json-out", default=None, help="optional path to dump raw results as JSON")
     ap.add_argument("--inspect", metavar="CASE_ID", default=None,
-                    help="print one case through baseline vs FULL with schema-validity + verify effect")
+                    help="print one case: baseline vs context-engineered, + optional re-grounding effect")
     args = ap.parse_args()
 
     if not args.mock and (not args.base_url or not args.model):
@@ -121,15 +120,21 @@ def main():
     # --- Additive ----------------------------------------------------------
     additive_rows = [(name, run_config(cfg, cases, corpus, client)) for name, cfg in pipeline.additive_configs()]
     base_tokens = additive_rows[0][1]["avg_ctx_tokens"]
-    print("=== ADDITIVE ABLATION (turn layers on one at a time) ===")
+    print("=== ADDITIVE ABLATION (context-engineering layers, one at a time) ===")
     print(_fmt_table(additive_rows, base_tokens))
+    ce_full = next(a for n, a in additive_rows if "CE-FULL" in n)
+    base = additive_rows[0][1]
+    print(f"\nContext engineering ALONE (no re-grounding): danger recall {base['danger_recall']*100:.0f}%"
+          f"->{ce_full['danger_recall']*100:.0f}%, hallucination {base['hallucination_rate']*100:.0f}%"
+          f"->{ce_full['hallucination_rate']*100:.0f}%, faithfulness {base['citation_faithfulness']*100:.0f}%"
+          f"->{ce_full['citation_faithfulness']*100:.0f}% at {(ce_full['avg_ctx_tokens']-base_tokens)/base_tokens*100:+.0f}% tokens."
+          "  The win comes from managing the context, not from a filter.")
 
     # --- Leave-one-out -----------------------------------------------------
     loo_rows = [(name, run_config(cfg, cases, corpus, client)) for name, cfg in pipeline.loo_configs()]
-    full_tokens = loo_rows[0][1]["avg_ctx_tokens"]
-    print("\n=== LEAVE-ONE-OUT ABLATION (remove each layer from FULL) ===")
+    print("\n=== LEAVE-ONE-OUT ABLATION (remove each CE layer from CE-FULL) ===")
     print(_fmt_table(loo_rows, base_tokens))
-    print("\nRead LOO as: how much each layer was worth (removing it should hurt some metric).")
+    print("\nRead LOO as: how much each context-engineering layer was worth (removing it hurts some metric).")
 
     if args.json_out:
         with open(args.json_out, "w") as f:

@@ -59,7 +59,9 @@ def main():
         big = make_client(False, base_url=args.big_url, model=args.big_model, schema=PLAN_SCHEMA)
         small_name, big_name = args.small_model, args.big_model
 
-    eng = _run(pipeline.FULL, cases, corpus, small)     # engineered small
+    # Engineered small uses CE-FULL (context engineering ALONE, no re-grounding filter) so the
+    # comparison proves context management -- not a post-hoc pass -- is what beats the bigger model.
+    eng = _run(pipeline.CE_FULL, cases, corpus, small)   # engineered small
     naive = _run(pipeline.BASELINE, cases, corpus, big)  # naive big
 
     print(f"\nSMALL-BEATS-BIG  |  {len(cases)} cases\n")

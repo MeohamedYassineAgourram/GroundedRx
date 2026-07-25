@@ -104,7 +104,7 @@ st.caption(f"Prescribed: {', '.join(case['meds'])}  ·  ground-truth traps that 
            f"{', '.join(case['forbidden_terms'])}")
 
 if st.button("Generate grounded aftercare plan", type="primary"):
-    with st.spinner("Running retrieve → compress → schema → verify ..."):
+    with st.spinner("Running retrieve → compress → structure → re-ground ..."):
         full = pipeline.run_case(case, corpus, client, pipeline.FULL)
         cols = st.columns(2) if compare else [st.container()]
         with cols[0]:
